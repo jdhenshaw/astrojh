@@ -21,7 +21,7 @@ DESCRIPTION = metadata.get('description', 'Useful astronomy modules')
 AUTHOR = metadata.get('author', 'Jonathan D. Henshaw')
 AUTHOR_EMAIL = metadata.get('author_email', '')
 LICENSE = metadata.get('license', 'unknown')
-URL = metadata.get('url', '''')
+URL = metadata.get('url', '')
 __minimum_python_version__ = metadata.get("minimum_python_version", "3.6")
 
 # Enforce Python version check - this is the same check as in __init__.py but
