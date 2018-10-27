@@ -6,8 +6,6 @@ import astropy.units as u
 from astropy.units import cds
 from astropy.units import astrophys as ap
 
-# Define subroutines
-
 def cs( t, mu_p=2.33 ):
     """
     Accepts temperature in kelvin and a molecular weight and computes the sound
