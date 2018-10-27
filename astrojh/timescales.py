@@ -5,6 +5,7 @@ import numpy as np
 import astropy.units as u
 from astropy.units import cds
 from astropy.units import astrophys as ap
+from .conversions import *
 
 def tff( number_density, mu_p=2.8, outputunit='yr' ):
     """
@@ -20,10 +21,7 @@ def tff( number_density, mu_p=2.8, outputunit='yr' ):
     outputunit : string (optional)
         Choose the output unit (default = yr)
     """
-    number_density = number_density * u.cm**-3
-    mass_density = mu_p * ap.M_p * number_density
-    mass_density.to(u.kg / u.m**3)
-    mass_density = mass_density.to(u.kg / u.m**3)
+    mass_density = n2rho(number_density, mu_p)
     tff = np.sqrt( (3. * np.pi) / (32. * cds.G * mass_density) )
 
     print(outputunit)
