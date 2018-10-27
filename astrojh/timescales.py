@@ -1,36 +1,38 @@
-#==========================================================================================================#
-# timescales.PY
-#==========================================================================================================#
-
-#!/opt/local/bin/python
-
-# A collection of subroutines to calculate astronomically important timescales
-
-#==========================================================================================================#
-
-# Import modules
-
+#==============================================================================#
+# timescales.py
+#==============================================================================#
 import numpy as np
+import astropy.units as u
+from astropy.units import cds
 
 # Global parameters
 
-G            = 6.67408e-11
-mh           = 1.6737236e-27 # Mass of a hydrogen atom in kg
-msun         = 1.989e30 # Mass of sun in kg
-pc           = 3.08567758e16 # A parsec in metres
-percm2perm   = 1.e6
-sin1yr       = 3.15569e7
+mh = 1.6737236e-27 * u.kg # Mass of a hydrogen atom in kg
 
-# Define subroutines
+def tff( number_density, mu=2.8, outputunit='yr' ):
+    """
+    Accepts a number density in units of particles per cubic centimetre and
+    derives the free fall time in yrs
 
-def tff_spherical( number_density, mu ):
+    Parameters
+    ----------
+    number_density : float
+        number density in particles per cubic centimetre
+    mu : float (optional)
+        Molecular mass. If none given mu=2.8 (molecular hydrogen) is used
+    outputunit : string (optional)
+        Choose the output unit (default = yr)
+    """
+    number_density = number_density * u.cm**-3
+    mass_density = mu * mh * number_density
+    mass_density.to(u.kg / u.m**3)
+    tff = np.sqrt( (3. * np.pi) / (32. * cds.G * mass_density) )
 
-    # Accepts a number density in units of particles per cubic centimetre and derives the free fall time in yrs
-
-    mass_density = mu * mh * number_density * percm2perm
-
-    tff = np.sqrt( (3. * np.pi) / (32. * G * mass_density) )
-
-    tff = tff / sin1yr # free-fall time in years
+    if outputunit='yr'
+        tff.to(u.yr)
+    elif outputunit='s':
+        tff.to(u.s)
+    else:
+        raise ValueError('Please enter a valid ouput unit')
 
     return tff
