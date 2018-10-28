@@ -5,8 +5,9 @@ import numpy as np
 import astropy.units as u
 from astropy.units import cds
 from astropy.units import astrophys as ap
+from astropy import constants as const
 
-def N2msd(column_density, mu_p=2.8):
+def Ntomsd(column_density, mu_p=2.8):
     """
     Accepts a column density in units of particles per square centimetre and the
     mean molecular mass and converts this to a mass surface density
@@ -23,7 +24,7 @@ def N2msd(column_density, mu_p=2.8):
     msd = msd.to(ap.solMass / u.pc**2)
     return msd
 
-def msd2N(msd, mu_p=2.8):
+def msdtoN(msd, mu_p=2.8):
     """
     Accepts a mass surface density in units of solar masses per square pc and
     the mean molecular mass and converts this to a column density
@@ -40,7 +41,7 @@ def msd2N(msd, mu_p=2.8):
     column_density = column_density.to(1./u.cm**2.)
     return column_density
 
-def n2rho(number_density, mu_p=2.8):
+def ntorho(number_density, mu_p=2.8):
     """
     Accepts a number density in units of particles per cubic centimetre and the
     mean molecular mass and converts this to a mass density
@@ -57,7 +58,7 @@ def n2rho(number_density, mu_p=2.8):
     mass_density = mass_density.to(u.kg / u.m**3)
     return mass_density
 
-def rho2n(mass_density, mu_p=2.8):
+def rhoton(mass_density, mu_p=2.8):
     """
     Accepts a volume density in units of particles per cubic centimetre and the
     mean molecular mass and converts this to a number density
@@ -73,3 +74,57 @@ def rho2n(mass_density, mu_p=2.8):
     number_density = mass_density / mu_p * ap.M_p
     number_density = number_density.to(u.cm**-3)
     return number_density
+
+def masstorho(mass, radius):
+    """
+    Accepts mass in solar masses and radius in pc and computes density
+
+    Parameters
+    ----------
+    mass : float
+        mass (Msun)
+    radius : float
+        radius (pc)
+    """
+    mass = mass * ap.solMass
+    radius = radius * u.pc
+    volume = (4. / 3.) * np.pi * radius**3.0
+    mass_density = mass / volume
+    mass_density=mass_density.to(u.kg/u.m**3)
+    return mass_density
+
+def masstorhoau(mass, radius):
+    """
+    Accepts mass in solar masses and radius in au and computes density
+
+    Parameters
+    ----------
+    mass : float
+        mass (Msun)
+    radius : float
+        radius (au)
+    """
+    mass = mass * ap.solMass
+    radius = radius * u.AU
+    volume = (4. / 3.) * np.pi * radius**3.0
+    mass_density = mass / volume
+    mass_density=mass_density.to(u.kg/u.m**3)
+    return mass_density
+
+def rhotomass(mass_density, radius):
+    """
+    Accepts density in kg/m^3 and radius in pc and computes mass
+
+    Parameters
+    ----------
+    mass_density : float
+        density (kg/m^3)
+    radius : float
+        radius (pc)
+    """
+    mass_density = mass_density * (u.kg/u.m**3)
+    radius = radius * u.pc
+    volume = (4. / 3.) * np.pi * radius**3.0
+    mass = mass_density * volume
+    mass = mass*(ap.solMass)
+    return mass

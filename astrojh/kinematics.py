@@ -5,6 +5,8 @@ import numpy as np
 import astropy.units as u
 from astropy.units import cds
 from astropy.units import astrophys as ap
+from astropy import constants as const
+from .conversions import *
 
 def cs( t, mu_p=2.33 ):
     """
@@ -15,12 +17,12 @@ def cs( t, mu_p=2.33 ):
     ----------
     t : float
         Temperature (K)
-    mu : float (optional)
+    mu_p : float (optional)
         Mean molecular mass (default=2.33)
 
     """
     t = t*u.K
-    cs = np.sqrt(( cds.k * t ) / ( mu_p * ap.M_p ))
+    cs = np.sqrt(( const.k_B * t ) / ( mu_p * ap.M_p ))
     cs = cs.to(u.km/u.s)
     return cs
 
@@ -130,3 +132,54 @@ def mach_3d( sig, t, mu, mu_p=2.33 ):
     mach = mach_1d( sig, t, mu, mu_p )
     mach3d = mach*np.sqrt(3.)
     return mach3d
+
+def va( B, number_density, mu=2.8):
+    """
+    Accepts magnetic field strength in Gauss and number density in particles per
+    cubic centimetre and computes the alfven speed. Returns in km/s
+
+    Parameters
+    ----------
+    B : float
+        Magnetic field strength (G)
+    number_density : float
+        number density (cm^-3)
+    mu : float (optional)
+        Molecular mass used to estimate the mass density (default=2.8)
+
+    """
+    mass_density = ntorho(number_density, mu)
+    B = B*u.G
+
+    alfven_speed = B / (const.mu0 * mass_density )**0.5
+    alfven_speed = alfven_speed.to(u.km/u.s)
+    return alfven_speed
+
+def plasma_beta( t, B, number_density, mu=2.8, mu_p=2.33 ):
+    """
+    Accepts temperature in K, magnetic field strength in Gauss and number
+    density in particles per cubic centimetre and computes the alfven speed.
+    Returns in km/s
+
+    Parameters
+    ----------
+    t : float
+        Temperature (K)
+    B : float
+        Magnetic field strength (G)
+    number_density : float
+        number density (cm^-3)
+    mu : float (optional)
+        Molecular mass used to estimate the mass density (default=2.8)
+    mu_p : float (optional)
+        Mean molecular mass (default=2.33)
+
+    """
+    from .kinematics import va
+    from .kinematics import cs
+
+    sound_speed = cs( t, mu_p )
+    alfven_speed = va( B, number_density, mu )
+
+    beta = 2. * (sound_speed/alfven_speed)**2.
+    return beta

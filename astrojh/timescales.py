@@ -6,6 +6,7 @@ import astropy.units as u
 from astropy.units import cds
 from astropy.units import astrophys as ap
 from .conversions import *
+from astropy import constants as const
 
 def tff( number_density, mu_p=2.8, outputunit='yr' ):
     """
@@ -21,10 +22,9 @@ def tff( number_density, mu_p=2.8, outputunit='yr' ):
     outputunit : string (optional)
         Choose the output unit (default = yr)
     """
-    mass_density = n2rho(number_density, mu_p)
-    tff = np.sqrt( (3. * np.pi) / (32. * cds.G * mass_density) )
+    mass_density = ntorho(number_density, mu_p)
+    tff = np.sqrt( (3. * np.pi) / (32. * const.G * mass_density) )
 
-    print(outputunit)
     if outputunit=='yr':
         tff=tff.to(u.yr)
     elif outputunit=='s':
@@ -33,3 +33,43 @@ def tff( number_density, mu_p=2.8, outputunit='yr' ):
         raise ValueError('Please enter a valid ouput unit')
 
     return tff
+
+def tcross( size, sigma ):
+    """
+    Accepts size in pc and 3D velocity dispersion in km/s and computes the
+    turbulent crossing time. Returns in yr
+
+    Parameters
+    ----------
+    size : float
+        The size of the source (pc)
+    sigma : float
+        velocity dispersion (km/s) assumes already in 3D i.e. sqrt(3)*sigma1D
+
+    """
+    size=size*u.pc
+    sigma=sigma*(u.km/u.s)
+
+    tcross=size/sigma
+    tcross=tcross.to(u.yr)
+    return tcross
+
+def tdyn( size, vel ):
+    """
+    Accepts size in pc and velocity in km/s and computes the dynamical age of an
+    object (e.g. HII region or expanding shell). Returns in yr
+
+    Parameters
+    ----------
+    size : float
+        The size of the source (pc)
+    vel : float
+        velocity dispersion (km/s) assumes already in 3D i.e. sqrt(3)*sigma1D
+
+    """
+    size=size*u.pc
+    vel=vel*(u.km/u.s)
+
+    tdyn=size/vel
+    tdyn=tcross.to(u.yr)
+    return tdyn
