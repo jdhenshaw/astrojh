@@ -9,6 +9,7 @@ from .conversions import *
 from astropy import constants as const
 import scipy.stats as stats
 import statsmodels.api as sm
+from scipy import signal
 
 def basic_info( arr, sarr=None ):
     """
@@ -126,3 +127,22 @@ def fft1d( xarr, yarr, n, d ):
     yfp = np.abs(yf[:n//2])
 
     return xfp, yfp
+
+def peakfinder( xarr, yarr, **kwargs):
+    """
+    Accepts two 1D arrays and looks for the peaks
+
+    Parameters
+    ----------
+    xarr : ndarray
+        array of x values
+    yarr : ndarray
+        array of y values within which you want to find peaks
+
+    """
+    peak_info = signal.find_peaks( yarr, **kwargs )
+    #print(peak_info)
+    xpospeaks = xarr[peak_info[0]]
+    if 'prominences' in peak_info[1]:
+        ypospeaks = peak_info[1]['prominences']
+    return xpospeaks, ypospeaks
