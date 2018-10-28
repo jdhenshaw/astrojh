@@ -6,7 +6,6 @@ import astropy.units as u
 from astropy.units import cds
 from astropy.units import astrophys as ap
 from .conversions import *
-from .kinematics import cs
 from astropy import constants as const
 import scipy.stats as stats
 import statsmodels.api as sm
