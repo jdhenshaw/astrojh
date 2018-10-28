@@ -102,3 +102,27 @@ def basic_info( arr, sarr=None ):
                                                   normaltest[1],  ')',)
         print("")
         print('===============================================================')
+
+def fft1d( xarr, yarr, n, d ):
+    """
+    Accepts two 1D arrays (x, y) a sampling spacing and the number of samples
+    and computes one-dimensional discrete Fourier Transform.
+
+    Parameters
+    ----------
+    xarr : numpy array
+        array of x values
+    yarr : numpy array
+        array of y values
+    n : float
+        number of samples
+    d : float
+        sampling spacing (frequency on which x values are measured)
+
+    """
+    xf = np.fft.fftfreq(n, d=d)
+    yf = np.fft.fft(yarr, n=n)
+    xfp = xf[:n//2]
+    yfp = np.abs(yf[:n//2])
+
+    return xfp, yfp
