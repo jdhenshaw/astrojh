@@ -105,8 +105,8 @@ def rectmask(shape, centre=None, width=None, wcs=None):
         world coordinate system information
 
     """
-    y = int(np.shape(img)[0])
-    x = int(np.shape(img)[1])
+    y = int(shape[0])
+    x = int(shape[1])
     if centre is None: # use the middle of the image
         centre = [y//2, x//2]
     if width is None:
@@ -121,8 +121,8 @@ def rectmask(shape, centre=None, width=None, wcs=None):
     dist_from_centre = np.zeros([y,x])
 
     if np.size(width)==2:
-        xp=int(centre[0]+width[1]//2); xn=int(centre[0]-width[1]//2)
-        yp=int(centre[1]+width[0]//2); yn=int(centre[1]-width[0]//2)
+        xp=int(centre[1]+width[1]//2); xn=int(centre[1]-width[1]//2)
+        yp=int(centre[0]+width[0]//2); yn=int(centre[0]-width[0]//2)
     else:
         xp=int(centre[1]+width/2); xn=int(centre[1]-width/2)
         yp=int(centre[0]+width/2); yn=int(centre[0]-width/2)
@@ -176,8 +176,8 @@ def rectmask_img(img, centre=None, width=None, wcs=None):
     dist_from_centre = np.zeros([y,x])
 
     if np.size(width)==2:
-        xp=int(centre[0]+width[1]//2); xn=int(centre[0]-width[1]//2)
-        yp=int(centre[1]+width[0]//2); yn=int(centre[1]-width[0]//2)
+        xp=int(centre[1]+width[1]//2); xn=int(centre[1]-width[1]//2)
+        yp=int(centre[0]+width[0]//2); yn=int(centre[0]-width[0]//2)
     else:
         xp=int(centre[1]+width/2); xn=int(centre[1]-width/2)
         yp=int(centre[0]+width/2); yn=int(centre[0]-width/2)

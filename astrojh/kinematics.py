@@ -2,11 +2,16 @@
 # kinematics.py
 #==============================================================================#
 import numpy as np
+import sys
 import astropy.units as u
 from astropy.units import cds
 from astropy.units import astrophys as ap
 from astropy import constants as const
 from .conversions import *
+sys.path.append('/Users/henshaw/Dropbox/Work/Code/GitHub/astrolibpy/mpfit/')
+import mpfit
+from .functionalforms import *
+from .imagetools import index_coords
 
 def cs( t, mu_p=2.33 ):
     """
@@ -183,3 +188,50 @@ def plasma_beta( t, B, number_density, mu=2.8, mu_p=2.33 ):
 
     beta = 2. * (sound_speed/alfven_speed)**2.
     return beta
+
+def planefit(x, y, z, errz, pinit=None):
+    """
+    Fits a first-degree bivariate polynomial to data
+
+    Parameters
+    ----------
+    x : ndarray
+        array of x values
+    y : ndarray
+        array of y values
+    z : ndarray
+        data to be fit
+    errz : ndarray
+        uncertainties on z data
+    pinit : ndarray (optional)
+        initial guesses for fitting
+    """
+    if pinit is None:
+        pinit=[0,0,0]
+    data = {'x':x, 'y':y, 'z':z, 'err':errz}
+    model = mpfit.mpfit(residuals, pinit, functkw=data, quiet = True)
+    popt = model.params
+    perr = model.perror
+    return popt, perr
+
+def subtractplane_img(img, model):
+    """
+    Subtracts a model plane from data
+
+    Parameters
+    ----------
+    img : ndarray
+        2-D image
+    model : ndarray
+        Model parameters output from planefit
+        
+    """
+
+    modelimg=np.empty(np.shape(img))
+    modelimg.fill(np.NaN)
+    for x in range(len(modelimg[0,:])):
+        for y in range(len(modelimg[:,0])):
+            if ~np.isnan(img[y,x]):
+                modelimg[y,x]=polynomial_plane1D(x,y,model)
+    residualimg = img-modelimg
+    return residualimg, modelimg
