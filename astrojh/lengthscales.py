@@ -5,7 +5,7 @@ import numpy as np
 import astropy.units as u
 from astropy.units import cds
 from astropy.units import astrophys as ap
-from .conversions import *
+from .conversions import ntorho, Ntomsd
 from .kinematics import cs
 from astropy import constants as const
 

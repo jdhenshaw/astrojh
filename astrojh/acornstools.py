@@ -2,14 +2,6 @@
 # acornstools.py
 #==============================================================================#
 import numpy as np
-import astropy.units as u
-from astropy.units import cds
-from astropy.units import astrophys as ap
-from .conversions import *
-from astropy import constants as const
-import scipy.stats as stats
-import statsmodels.api as sm
-from scipy import signal
 from astropy.io import fits
 
 def cubetrim(cube, ppv_vol):

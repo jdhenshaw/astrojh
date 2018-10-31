@@ -2,13 +2,8 @@
 # functionalforms.py
 #==============================================================================#
 import numpy as np
-import astropy.units as u
-from astropy.units import cds
-from astropy.units import astrophys as ap
-from astropy import constants as const
-from .conversions import *
 
-def polynomial_plane1D(x, y, p):
+def polynomial_plane1D(x, y, mx, my, c):
     """
     The model function with parameters p
 
@@ -20,15 +15,48 @@ def polynomial_plane1D(x, y, p):
         array of y values
 
     """
-    a = p[0]
-    b = p[1]
-    c = p[2]
-    return a + b*x + c*y
+    return np.array([mx*x + my*y + c])
 
-def residuals(p, fjac=None, x=None, y=None, z=None, err=None ):
+def spiral_RM09(N, B, A, theta):
     """
-    Function that returns the weighted deviates
+    Model spiral pattern from Ringermacher & Mead 09. This function
+    intrinsically generates a bar in a continuous, fixed relationship relative
+    to an arm of arbitrary winding sweep. Unlike the logarithmic spiral, this
+    spiral does not have constant pitch.
+
+    Parameters
+    ----------
+    N : float
+        Winding number
+    B : float
+        Together with N determines the spiral pitch. Greater B results in
+        greater arm sweep and smaller bar/bulge, while smaller B fits larger
+        bar/bulge with a sharper bar/arm junction. Thus, B controls the
+        ‘bulge-to-arm’ size, while N controls the tightness much like the Hubble
+        scheme
+    A : float
+        A scaling factor
+    theta : ndarray
+        an array of angles. Directly relates circular to hyperbolic functions
+        via the Gudermannian function theta(x) = 2*arctan(exp(x))
     """
-    model  = polynomial_plane1D(x, y, p)
-    status = 0
-    return([status, (z-model)/err])
+    return A/np.log10(B*np.tan(theta/2/N))
+
+def logspiral(a, b, theta):
+    """
+    Logarithmic spiral
+
+    Parameters:
+    -----------
+    a : float
+        determines the initial distance of the spiral from the origin
+    b : float
+        determines the winding properties of the arm
+    theta : ndarray
+        the azimuthal angle
+
+    Notes:
+    ------
+    see https://github.com/dh4gan/tache for more spiral definitions
+    """
+    return a*np.exp(b*theta)

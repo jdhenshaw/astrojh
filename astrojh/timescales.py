@@ -5,7 +5,6 @@ import numpy as np
 import astropy.units as u
 from astropy.units import cds
 from astropy.units import astrophys as ap
-from .conversions import *
 from astropy import constants as const
 
 def tff( number_density, mu_p=2.8, outputunit='yr' ):

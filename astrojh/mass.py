@@ -5,7 +5,6 @@ import numpy as np
 import astropy.units as u
 from astropy.units import cds
 from astropy.units import astrophys as ap
-from .conversions import *
 from astropy.modeling.blackbody import blackbody_lambda, blackbody_nu
 from astropy import constants as const
 
@@ -65,7 +64,7 @@ def mass_k08( integrated_flux, wave, t, kappa, distance  ):
     t=t*u.K
     kappa=kappa*(u.cm**2/u.g)
     distance=distance*(u.pc)
-    
+
     m = 0.12 * ( np.exp( 1.439 * ( wave/(1e-3 * u.m) )**-1.0 *
                ( t/(10.0 * u.K) )**-1.0 ) - 1.0 ) * \
                     (( kappa/ (0.01 * (u.cm**2/u.g)) )**-1.0) * \

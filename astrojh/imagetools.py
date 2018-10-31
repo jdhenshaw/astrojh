@@ -2,17 +2,7 @@
 # imagetools.py
 #==============================================================================#
 import numpy as np
-import astropy.units as u
-from astropy.units import cds
-from astropy.units import astrophys as ap
-from .conversions import *
-from astropy import constants as const
-import scipy.stats as stats
-import statsmodels.api as sm
-from scipy import signal
 from scipy.ndimage import map_coordinates
-from scipy.ndimage.interpolation import shift
-from scipy.optimize import curve_fit, minimize
 
 def makeGaussian(size, fwhm = 3, centre=None):
     """
@@ -178,6 +168,6 @@ def polar2cart(r, theta):
     x, y : floats or arrays
         Cartesian coordinates
     """
-    y = r * np.cos(theta)
-    x = r * np.sin(theta)
+    x = r * np.cos(theta)
+    y = r * np.sin(theta)
     return x, y

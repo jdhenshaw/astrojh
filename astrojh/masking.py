@@ -2,13 +2,6 @@
 # masking.py
 #==============================================================================#
 import numpy as np
-import astropy.units as u
-from astropy.units import cds
-from astropy.units import astrophys as ap
-from .conversions import *
-from astropy import constants as const
-import scipy.stats as stats
-import statsmodels.api as sm
 from astropy.coordinates import SkyCoord
 from astropy.coordinates import ICRS, Galactic, FK4, FK5
 from astropy.coordinates import Angle, Latitude, Longitude
