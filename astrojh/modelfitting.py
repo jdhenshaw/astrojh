@@ -3,7 +3,7 @@
 #==============================================================================#
 import numpy as np
 import lmfit
-from .functionalforms import polynomial_plane1D, spiral_RM09
+from .functionalforms import polynomial_plane1D, spiral_RM09, logspiral
 from .imagetools import cart2polar, polar2cart
 import sys
 
@@ -124,7 +124,7 @@ def spiralfit(x, y, pinit=None, method='leastsq', model='RM09', project=True,
     y : ndarray
         array of y values
     pinit : ndarray (optional)
-        initial guesses for fitting. Format = [mx, my, c]
+        initial guesses for fitting.
     method : string (optional)
         method used for the minimisation (default = leastsq)
     model : string (optional)
@@ -154,7 +154,7 @@ def spiralfit(x, y, pinit=None, method='leastsq', model='RM09', project=True,
 
 def residual_spiral(pars, x, y, model=None, project=True):
     """
-    Minmizer for lmfit for fitting a 2-D plane to data
+    Minmizer for fitting a spiral
 
     Parameters
     ----------
@@ -198,11 +198,13 @@ def make_spiral(pars,model,project=True):
 
     if model=='RM09':
         r = spiral_RM09(parvals['N'], parvals['B'], parvals['A'], theta)
+    elif model=='logspiral':
+        r = logspiral(parvals['a'], parvals['b'], theta)
 
     r = np.hstack((r[::-1],r[1:]))
     theta = np.hstack((theta[::-1], (theta+np.pi)[1:] ))
 
-    x,y = polar2cart(r, theta)
+    x,y = transform_to_cart(r, theta, parvals['x0'], parvals['y0'])
     z = np.zeros_like(x)
 
     if project:
@@ -263,19 +265,62 @@ def get_spiral_pars(pinit,model,project=True):
 
     """
     pars=lmfit.Parameters()
+
+    parnames=['x0','y0']
+    for i in range(len(parnames)):
+        if pinit is None:
+            pars.add(parnames[i],value=0.0)
+        else:
+            pars.add(parnames[i],value=pinit[i])
+
     if model == 'RM09':
-        parnames = ['N','B','A']
-        for i in range(len(parnames)):
+        parnames.extend(['N','B','A'])
+        for i in range(2,len(parnames)):
             if pinit is None:
-                pars.add(parnames[i], value=1.0)
+                pars.add(parnames[i], value=0.0, min = 0, max=100.0)
             else:
-                pars.add(parnames[i], value=pinit[i])
+                pars.add(parnames[i], value=pinit[i], min = 0, max=100.0)
+
         if project:
             parnames.extend(['e0','e1','e2'])
-            for i in range(len(parnames)):
+            for i in range(5,len(parnames)):
                 if pinit is None:
-                    pars.add(parnames[i], value=1.0)
+                    pars.add(parnames[i], value=0.0, min = 0, max=360)
                 else:
-                    pars.add(parnames[i], value=pinit[i])
+                    pars.add(parnames[i], value=pinit[i], min = 0, max=360)
+
+    if model == 'logspiral':
+        parnames.extend(['a','b'])
+        for i in range(2,len(parnames)):
+            if pinit is None:
+                pars.add(parnames[i], value=0.0, min = 0, max=10.0)
+            else:
+                pars.add(parnames[i], value=pinit[i], min = 0, max=10.0)
+
+        if project:
+            parnames.extend(['e0','e1','e2'])
+            for i in range(4,len(parnames)):
+                if pinit is None:
+                    pars.add(parnames[i], value=0.0, min = 0, max=360)
+                else:
+                    pars.add(parnames[i], value=pinit[i], min = 0, max=360)
 
     return pars, parnames
+
+def transform_to_cart(r, theta, x0, y0):
+    """
+    Transform polar coordinates to Cartesian
+
+    Parameters
+    -------
+    r, theta : floats or arrays
+        Polar coordinates
+
+    Returns
+    ----------
+    x, y : floats or arrays
+        Cartesian coordinates
+    """
+    x = r * np.cos(theta)+x0
+    y = r * np.sin(theta)+y0
+    return x, y

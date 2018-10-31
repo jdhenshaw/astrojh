@@ -40,7 +40,7 @@ def spiral_RM09(N, B, A, theta):
         an array of angles. Directly relates circular to hyperbolic functions
         via the Gudermannian function theta(x) = 2*arctan(exp(x))
     """
-    return A/np.log10(B*np.tan(theta/2/N))
+    return A/np.log10(B*np.tanh(theta/2/N))
 
 def logspiral(a, b, theta):
     """

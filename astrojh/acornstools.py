@@ -6,6 +6,10 @@ from astropy.io import fits
 import os
 import glob
 from astropy.utils.console import ProgressBar
+from acorns import Acorns
+from astropy.table import Table
+from astropy.table import Column
+import sys
 
 def cubetrim(cube, ppv_vol):
     """
@@ -152,3 +156,43 @@ def combine_masks(maskdir, outputdir='./', outputfile='mastermask.fits',
         hdu.writeto(outputdir+outputfile, overwrite=True)
 
     return mastermask
+
+def get_leaf_positions(acorn, outputdir='./', outputfile='leafpositions.dat',
+                       clipbelow=None):
+    """
+    Reads in an acorn and outputs the positions of all the leaves
+
+    Parameters
+    ----------
+    acorn : acorns output file
+        acorns output file
+    outputdir : string (optional)
+        output directory (default will be current directory)
+    outputfile : string (optional)
+        output file name (default is leafpositions.dat)
+    clipbelow : float
+        Will clip all leaves whose peak flux sits below this value
+    """
+    A = Acorns.load_from(acorn)
+    xpeaks=[]
+    ypeaks=[]
+    for tree in A.forest:
+        for leaf in A.forest[tree].leaves:
+            peakvalue = leaf.statistics[0][1]
+            if clipbelow is not None:
+                if peakvalue > clipbelow:
+                    peakloc = leaf.peak_location
+                    xpeaks.append(peakloc[0])
+                    ypeaks.append(peakloc[1])
+            else:
+                peakloc = leaf.peak_location
+                xpeaks.append(peakloc[0])
+                ypeaks.append(peakloc[1])
+
+    headings=['x position', 'y position']
+    table = Table(meta={'name':'leaf peak positions'})
+    table['x position'] = Column(xpeaks)
+    table['y position'] = Column(ypeaks)
+    table.write(outputfile, format='ascii', overwrite=True)
+
+    return xpeaks,ypeaks
