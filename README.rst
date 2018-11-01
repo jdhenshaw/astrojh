@@ -5,13 +5,4 @@ Useful astronomy modules
     :target: http://www.astropy.org
     :alt: Powered by Astropy Badge
 
-A selection of useful stuff
-
-License
--------
-
-This project is Copyright (c) Jonathan D. Henshaw and licensed under
-the terms of the Other license. This package is based upon
-the `Astropy package template <https://github.com/astropy/package-template>`_
-which is licensed under the BSD 3-clause licence. See the licenses folder for
-more information.
+A selection of useful astronomy modules that I use day-to-day
