@@ -60,3 +60,37 @@ def logspiral(a, b, theta):
     see https://github.com/dh4gan/tache for more spiral definitions
     """
     return a*np.exp(b*theta)
+
+def archimedesspiral(a, theta):
+    """
+    archimedes spiral - power spiral function
+
+    Parameters:
+    -----------
+    a : float
+        determines the initial distance of the spiral from the origin
+    theta : ndarray
+        the azimuthal angle
+
+    Notes:
+    ------
+    see https://github.com/dh4gan/tache for more spiral definitions
+    """
+    return a*np.power(theta,1)
+
+def fermatspiral(a, theta):
+    """
+    fermat spiral - power spiral function
+
+    Parameters:
+    -----------
+    a : float
+        determines the initial distance of the spiral from the origin
+    theta : ndarray
+        the azimuthal angle
+
+    Notes:
+    ------
+    see https://github.com/dh4gan/tache for more spiral definitions
+    """
+    return a*np.power(theta,0.5)
