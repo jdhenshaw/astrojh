@@ -190,7 +190,7 @@ def residual_spiral(pars, xdata, ydata, model=None, project=None,
         dist[i] = np.min(d)
     return dist
 
-def make_spiral(pars,model,project=None, full=True, flip=False):
+def make_spiral(pars,model,project=None, full=True, flip=False, npoints=100):
     """
     Makes a spiral model for minimisation
 
@@ -202,10 +202,15 @@ def make_spiral(pars,model,project=None, full=True, flip=False):
         defines the model for fitting
     project : string (optional)
         project from galactic frame to plane of the sky
-
+    full : bool
+        Fit from 180 to 0 deg and also 180 to 360
+    flip : bool
+        Fit from -180 to 0 deg and also -180 to -360
+    npoints : int
+        number of points for the model
 	"""
     parvals = pars.valuesdict()
-    theta = np.arange(0,180*np.pi/180.,0.01)
+    theta = np.arange(0,180*np.pi/180.,1./npoints)
 
     if model=='RM09':
         r = spiral_RM09(parvals['N'], parvals['B'], parvals['A'], theta)

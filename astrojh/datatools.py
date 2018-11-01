@@ -5,6 +5,8 @@ import numpy as np
 from astropy.io import ascii
 from astropy.table import Table
 from astropy.table import Column
+from scipy.spatial import distance
+from scipy.spatial import cKDTree
 
 def create_table(columns, headings, table_name='mytable',
                  outputdir='./', outputfile='mytable.dat',
@@ -35,3 +37,29 @@ def create_table(columns, headings, table_name='mytable',
     mytable.write(outputdir+outputfile, format='ascii', overwrite=overwrite)
 
     return mytable
+
+def radial_data_selection(data, model, radius):
+    """
+    Selects all data within a given distance from a model. Returns array of
+    data points that lie within this boundary
+
+    Parameters
+    ----------
+    data : ndarray
+        array of x and y positions of a dataset
+    model : ndarray
+        array of x and y positions of a model
+    radius : float
+        search radius for data
+
+    """
+    kdtree = cKDTree(data.T)
+    idxs=[]
+    for i in range(len(model[0,:])):
+        coords = model[:,i]
+        idx = kdtree.query_ball_point(coords, radius, eps = 0)
+        idxs.extend(idx)
+    idxs=np.unique(idxs)
+
+    newdata=data[:,idxs]
+    return newdata
