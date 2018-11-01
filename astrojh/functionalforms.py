@@ -44,7 +44,7 @@ def spiral_RM09(N, B, A, theta):
 
 def logspiral(a, b, theta):
     """
-    Logarithmic spiral
+    Logarithmic spiral with constant pitch angle
 
     Parameters:
     -----------
@@ -94,3 +94,20 @@ def fermatspiral(a, theta):
     see https://github.com/dh4gan/tache for more spiral definitions
     """
     return a*np.power(theta,0.5)
+
+def hyperbolicspiral(c, theta):
+    """
+    hyperbolic spiral - power spiral function
+
+    Parameters:
+    -----------
+    c : float
+
+    theta : ndarray
+        the azimuthal angle
+
+    Notes:
+    ------
+    see https://github.com/dh4gan/tache for more spiral definitions
+    """
+    return c/theta

@@ -4,7 +4,7 @@
 import numpy as np
 import lmfit
 from .functionalforms import polynomial_plane1D, spiral_RM09, logspiral, \
-                             archimedesspiral, fermatspiral
+                             archimedesspiral, fermatspiral, hyperbolicspiral
 from .imagetools import cart2polar, polar2cart
 import sys
 from scipy import optimize
@@ -205,7 +205,7 @@ def make_spiral(pars,model,project=None, full=True, flip=False):
 
 	"""
     parvals = pars.valuesdict()
-    theta = np.arange(0,180.*np.pi/180.,0.01)
+    theta = np.arange(0,180*np.pi/180.,0.01)
 
     if model=='RM09':
         r = spiral_RM09(parvals['N'], parvals['B'], parvals['A'], theta)
@@ -215,6 +215,8 @@ def make_spiral(pars,model,project=None, full=True, flip=False):
         r = archimedesspiral(parvals['a'], theta)
     elif model=='fermatspiral':
         r = fermatspiral(parvals['a'], theta)
+    elif model=='hyperbolicspiral':
+        r = hyperbolicspiral(parvals['c'], theta)
 
     if full:
         r = np.hstack((r[::-1],r[1:]))
@@ -353,6 +355,25 @@ def get_spiral_pars(pinit,model,project=True):
 
     if model == 'fermatspiral':
         parnames.extend(['a'])
+        for i in range(2,len(parnames)):
+            if pinit is None:
+                pars.add(parnames[i], value=0.0, min = -np.inf, max=np.inf)
+            else:
+                pars.add(parnames[i], value=pinit[i], min = -np.inf, max=np.inf)
+
+        if project:
+            parnames.extend(['e0','e1','e2'])
+            for i in range(3,len(parnames)):
+                if pinit is None:
+                    pars.add(parnames[i], value=0.0, min =-np.inf ,max=np.inf)
+                else:
+                    pars.add(parnames[i], value=pinit[i], min =-np.inf ,max=np.inf)
+
+    #==========================================================================#
+    # hyperbolic spiral
+
+    if model == 'hyperbolicspiral':
+        parnames.extend(['c'])
         for i in range(2,len(parnames)):
             if pinit is None:
                 pars.add(parnames[i], value=0.0, min = -np.inf, max=np.inf)
