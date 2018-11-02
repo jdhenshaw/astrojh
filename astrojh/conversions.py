@@ -121,6 +121,7 @@ def rhotomass(mass_density, radius):
         density (kg/m^3)
     radius : float
         radius (pc)
+
     """
     mass_density = mass_density * (u.kg/u.m**3)
     radius = radius * u.pc
@@ -128,3 +129,49 @@ def rhotomass(mass_density, radius):
     mass = mass_density * volume
     mass = mass*(ap.solMass)
     return mass
+
+def masston( mass, radius, mu=2.8):
+    """
+    Accepts mass in solar masses and radius in pc and computes number density
+
+    Parameters
+    ----------
+    mass : float
+        mass (Msun)
+    radius : float
+        radius (pc)
+    mu : float (optional)
+        molecular weight (default = 2.8; i.e. assumes density is given as density
+        of hydrogen molecules)
+
+    """
+    mass = mass * ap.solMass
+    radius = radius * u.pc
+    volume = (4. / 3.) * np.pi * radius**3.0
+    mass_density = mass / volume
+    number_density = mass_density/(mu*ap.M_p)
+    number_density=number_density.to(1./u.cm**3)
+    return number_density
+
+def masstonau( mass, radius, mu=2.8):
+    """
+    Accepts mass in solar masses and radius in au and computes number density
+
+    Parameters
+    ----------
+    mass : float
+        mass (Msun)
+    radius : float
+        radius (au)
+    mu : float (optional)
+        molecular weight (default = 2.8; i.e. assumes density is given as density
+        of hydrogen molecules)
+
+    """
+    mass = mass * ap.solMass
+    radius = radius * u.AU
+    volume = (4. / 3.) * np.pi * radius**3.0
+    mass_density = mass / volume
+    number_density = mass_density/(mu*ap.M_p)
+    number_density=number_density.to(1./u.cm**3)
+    return number_density

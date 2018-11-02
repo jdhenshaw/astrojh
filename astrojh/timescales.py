@@ -72,3 +72,22 @@ def tdyn( size, vel ):
     tdyn=size/vel
     tdyn=tcross.to(u.yr)
     return tdyn
+
+def tdep( mass, SFR ):
+    """
+    Computes the depletion time - the time taken to convert all of the mass into
+    stars at the current star formation rate. Returns tdep in yr
+
+    Parameters
+    ----------
+    mass : float
+        mass (solar masses)
+    SFR : float
+        Star formation rate (solar masses/yr)
+
+    """
+    mass = mass * ap.solMass
+    SFR = SFR * (ap.solMass/u.yr)
+    tdep = mass/SFR
+    tdep.to(u.yr)
+    return tdep
