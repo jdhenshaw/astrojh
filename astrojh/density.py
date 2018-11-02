@@ -7,7 +7,7 @@ from astropy.units import cds
 from astropy.units import astrophys as ap
 from astropy.modeling.blackbody import blackbody_lambda, blackbody_nu
 from astropy import constants as const
-from interferometry import beam_solid_angle
+from .interferometry import beam_solid_angle
 
 def column_density(flux, beam, wave, t, kappa, mu=2.8):
     """
