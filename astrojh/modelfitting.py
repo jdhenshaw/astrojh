@@ -45,7 +45,7 @@ def planefit(x, y, z, err=None, pinit=None, method='leastsq', report_fit=False):
                              fcn_kws={'data':z, 'err':err},
                              nan_policy='propagate')
 
-    result = fitter.minimize(method=method,nan_policy='omit')
+    result = fitter.minimize(method=method)
 
     if report_fit:
         lmfit.report_fit(result)
@@ -401,8 +401,14 @@ def transform_to_cart(r, theta, x0, y0):
 
     Parameters
     -------
-    r, theta : floats or arrays
-        Polar coordinates
+    r : ndarray
+        radial position
+    theta : ndarry
+        angular position
+    x0 : float
+        origin x position
+    y0 : float
+        origin y position
 
     Returns
     ----------
@@ -412,3 +418,27 @@ def transform_to_cart(r, theta, x0, y0):
     x = (r * np.cos(theta))+x0
     y = (r * np.sin(theta))+y0
     return x, y
+
+def transform_to_polar(x, y, x0, y0):
+    """
+    Transform cartesian to polar
+
+    Parameters
+    -------
+    x : ndarray
+        cartesian x locations
+    y : ndarray
+        cartesian y locations
+    x0 : float
+        origin x position
+    y0 : float
+        origin y position
+
+    Returns
+    ----------
+    r, theta : floats or arrays
+        polar coordinates
+    """
+    r = np.sqrt((x+x0)**2 + (y-y0)**2)
+    theta = np.arctan2((x+x0), (y-y0))
+    return r, theta

@@ -15,7 +15,7 @@ def polynomial_plane1D(x, y, mx, my, c):
         array of y values
 
     """
-    return np.array([mx*x + my*y + c])
+    return mx*x + my*y + c
 
 def spiral_RM09(N, B, A, theta):
     """
