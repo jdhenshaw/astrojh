@@ -9,6 +9,8 @@ A collection of useful astronomy modules that I use day-to-day
 Installing
 ----------
 
+.. code-block::
+
   $ git clone https://github.com/jdhenshaw/astrojh.git
   $ cd astrojh
   $ python setup.py install
