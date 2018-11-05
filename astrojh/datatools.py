@@ -66,7 +66,7 @@ def map_to_model(data, model):
     """
     The shortest distance between a point and a model is orthogonal. This
     code takes an array of data and finds the closest point in a model curve.
-    Returns an array of indices corresponding to the closest matching points in 
+    Returns an array of indices corresponding to the closest matching points in
     the model
 
     Parameters
@@ -101,3 +101,33 @@ def distance_along_curve(model, origin=0):
     for i in range(len(model[0,:])):
         distance[i]+=np.linalg.norm(model[:,i]-originpoint)
     return distance
+
+def average_along_curve(x,y,z, weights=None):
+    """
+    Computes the average zdata quantity for each distance along a model. Returns
+    unique x data, y data, and mean z data
+
+    Parameters
+    ----------
+    x : ndarray
+        data values (to be averaged)
+    y : ndarray
+        corresponding xdata values
+    z : ndarray
+        x data corresponding to the model
+    weights : ndarray
+        optional weighting for averaging
+
+    """
+    uniquexvals,id = np.unique(x, return_index=True)
+    uniqueyvals = y[id]
+    meanz = []
+    for _x in uniquexvals:
+        ids = np.where(x==_x)[0]
+        if np.size(ids) != 0.0:
+            zdatasubsample = z[ids]
+            if weights is not None:
+                meanz.append(np.average(zdatasubsample, weights=weights))
+            else:
+                meanz.append(np.average(zdatasubsample))
+    return uniquexvals,uniqueyvals,np.asarray(meanz)

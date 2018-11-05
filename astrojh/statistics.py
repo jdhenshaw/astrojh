@@ -143,3 +143,69 @@ def peakfinder( xarr, yarr, **kwargs):
     else:
         ypospeaks=[]
     return xpospeaks, ypospeaks
+
+def structurefunction_1d(x, y, order=2, nsamples=None, spacing='linear'):
+    """
+    Computes 1D structure function
+
+    Parameters:
+    -----------
+    x : ndarray
+        array of x values - must be monotonically increasing
+    y : ndarray
+        array of y values
+    order : number (optional)
+        order of the structure function (default = the size of the x array)
+    nsamples : number (optional)
+        Frequency over which to sample the structure function (default=2)
+    spacing : string
+        linear or logarithmic spacing of the xdistances over which to compute SF
+    """
+
+    if nsamples is None:
+        nsamples = np.size(x)
+
+    # Compute spacing between 1 and np.size(x)//2 elements. 
+    if spacing=='linear':
+        structx = np.linspace(1, (np.size(x)-1)//2, num=nsamples)
+        structx = np.around(structx, decimals=0)
+        structx = np.unique(structx)
+    elif spacing=='log':
+        structx = np.logspace(np.log10(1), np.log10((np.size(x)-1)//2), num=nsamples)
+        structx = np.around(structx, decimals=0)
+        structx = np.unique(structx)
+
+    structx=structx.astype('int')
+    structy=[]
+
+    # For each distance element over which to compute the SF, compute distance
+    # to all pixels - select the relevant ones and compute SF
+    for _x in structx:
+        diff=[]
+        for i in range(len(x)):
+            # Find distance between current pixel and all other pixels
+            distances = compute_distance(i,np.arange(len(x)))
+            # select the relevant distance
+            id = np.where(distances==_x)[0]
+            if np.size(id)!=0:
+                originval=y[i]
+                # SF computation
+                diff.extend(np.abs(originval-y[id])**order)
+        diff=np.asarray(diff)
+        # SF is the average measured on a given size scale
+        structy.append(np.mean(diff))
+
+    return structx, np.power(structy, (1./order))
+
+def compute_distance(id, ids):
+    """
+    Compute the distance between the current value and all other values
+
+    Parameters
+    ----------
+    id : number
+        Current index
+    ids : ndarray
+        all other ids
+    """
+    return np.abs(id-ids)

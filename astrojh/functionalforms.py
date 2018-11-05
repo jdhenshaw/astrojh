@@ -3,9 +3,25 @@
 #==============================================================================#
 import numpy as np
 
+def polynomial_1D(x, mx, c):
+    """
+    Model 1D polynomial
+
+    Parameters
+    ----------
+    x : ndarray
+        array of x values
+    mx : float
+        gradient in x
+    c : float
+        offset
+
+    """
+    return mx*x + c
+
 def polynomial_plane1D(x, y, mx, my, c):
     """
-    The model function with parameters p
+    A 1D polynomial function for 2D data
 
     Parameters
     ----------
@@ -13,9 +29,32 @@ def polynomial_plane1D(x, y, mx, my, c):
         array of x values
     y : ndarray
         array of y values
+    mx : float
+        gradient in x
+    my : float
+        gradient in y
+    c : float
+        offset
 
     """
     return mx*x + my*y + c
+
+def sinusoid(x, A, T, p):
+    """
+    A sinusoidal function
+
+    Parameters
+    ----------
+    x : ndarray
+        array of x values
+    A : float
+        Amplitude of the sine wave
+    T : float
+        1/T = frequency of the wave
+    p : float
+        phase correction
+    """
+    return A*np.sin(2.*np.pi*(x-p)/T)
 
 def spiral_RM09(N, B, A, theta):
     """

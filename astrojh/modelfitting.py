@@ -3,15 +3,89 @@
 #==============================================================================#
 import numpy as np
 import lmfit
-from .functionalforms import polynomial_plane1D, spiral_RM09, logspiral, \
-                             archimedesspiral, fermatspiral, hyperbolicspiral
+from .functionalforms import *
 from .imagetools import cart2polar, polar2cart
 import sys
 from scipy import optimize
 
+def straightlinefit(x,y,err=None,pinit=None,method='leastsq',report_fit=False):
+    """
+    Fits a first-degree bivariate polynomial to 1D data
+    Parameters
+    ----------
+    x : ndarray
+        array of x values
+    y : ndarray
+        data to be fit
+    err : ndarray (optional)
+        uncertainties on y data
+    pinit : ndarray (optional)
+        initial guesses for fitting. Format = [mx, c]
+    method : string (optional)
+        method used for the minimisation (default = leastsq)
+
+    """
+    if pinit is None:
+        pars=lmfit.Parameters()
+        pars.add('mx', value=1.0)
+        pars.add('c', value=1.0)
+    else:
+        pars=lmfit.Parameters()
+        pars.add('mx', value=pinit[0])
+        pars.add('c', value=pinit[1])
+
+    fitter = lmfit.Minimizer(residual_straightline, pars,
+                             fcn_args=(x,y),
+                             fcn_kws={'err':err},
+                             nan_policy='propagate')
+
+    result = fitter.minimize(method=method)
+
+    if report_fit:
+        lmfit.report_fit(result)
+
+    popt = np.array([result.params['mx'].value,
+                     result.params['c'].value])
+    perr = np.array([result.params['mx'].stderr,
+                     result.params['c'].stderr])
+
+    return popt, perr, result
+
+def residual_straightline(pars, x, y, err=None):
+    """
+    Minmizer for lmfit for fitting a straight line
+
+    Parameters
+    ----------
+    pars : lmfit.Parameters()
+
+    x : ndarray
+        array of x positions
+    data : ndarray
+        1-D array containing the data
+    err : ndarray
+        uncertainties on the data
+
+    """
+
+    parvals = pars.valuesdict()
+    mx = parvals['mx']
+    c = parvals['c']
+    model = polynomial_1D(x, mx, c)
+
+    if y is None:
+        min = np.array([model])
+        return min
+    if err is None:
+        min = np.array([model - y])
+        return min
+    min = np.array([(model-y) / err])
+
+    return min
+
 def planefit(x, y, z, err=None, pinit=None, method='leastsq', report_fit=False):
     """
-    Fits a first-degree bivariate polynomial to data
+    Fits a first-degree bivariate polynomial to 2D data
 
     Parameters
     ----------
