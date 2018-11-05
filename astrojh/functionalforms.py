@@ -2,6 +2,7 @@
 # functionalforms.py
 #==============================================================================#
 import numpy as np
+from scipy.stats import norm
 
 def polynomial_1D(x, mx, c):
     """
@@ -55,6 +56,44 @@ def sinusoid(x, A, T, p):
         phase correction
     """
     return A*np.sin(2.*np.pi*(x-p)/T)
+
+def sinusoid_varyfreq(x, A, T, p):
+    """
+    A sinusoidal function
+
+    Parameters
+    ----------
+    x : ndarray
+        array of x values
+    A : float
+        Amplitude of the sine wave
+    T : ndarray
+        1/T = frequency of the wave an array of T values
+    p : float
+        phase correction
+    """
+    return A*np.sin(2.*np.pi*(x-p)/T)
+
+def gaussian(x, mu, std):
+    """
+    Model Gaussian profile - will accept multiple centroid values
+
+    Parameters
+    ----------
+    x : ndarray
+        array of xvalues
+    mu : ndarray
+        array of centroids (make sure this is an array otherwise it will fail)
+    std : float
+        array of standard devations
+
+    """
+    gauss=np.zeros_like(x, dtype=float)
+    for i in range(len(mu)):
+        normdist = norm(loc=mu[i], scale=std[i])
+        gauss+=normdist.pdf(x)
+
+    return gauss
 
 def spiral_RM09(N, B, A, theta):
     """
