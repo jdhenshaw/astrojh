@@ -102,33 +102,30 @@ def distance_along_curve(model, origin=0):
         distance[i]+=np.linalg.norm(model[:,i]-originpoint)
     return distance
 
-def average_along_curve(x,y,z, weights=None):
+def average_along_curve(distances, data, weights=None):
     """
-    Computes the average zdata quantity for each distance along a model. Returns
-    unique x data, y data, and mean z data
+    Computes the average data quantity for each distance along a model. Returns
+    unique distance and mean data
 
     Parameters
     ----------
-    x : ndarray
-        data values (to be averaged)
-    y : ndarray
-        corresponding xdata values
-    z : ndarray
-        x data corresponding to the model
+    distances : ndarray
+        distance along model curve
+    data : ndarray
+        corresponding data values
     weights : ndarray
         optional weighting for averaging
 
     """
-    uniquexvals,id = np.unique(x, return_index=True)
-    uniqueyvals = y[id]
-    meanz = []
-    for _x in uniquexvals:
-        ids = np.where(x==_x)[0]
+    uniquedistances = np.unique(distances)
+    meandata = []
+    for _d in uniquedistances:
+        ids = np.where(distances==_d)[0]
         if np.size(ids) != 0.0:
-            zdatasubsample = z[ids]
+            datasubsample = data[ids]
             if weights is not None:
                 weightssubsample = weights[ids]
-                meanz.append(np.average(zdatasubsample, weights=weightssubsample))
+                meandata.append(np.average(datasubsample, weights=weightssubsample))
             else:
-                meanz.append(np.average(zdatasubsample))
-    return uniquexvals,uniqueyvals,np.asarray(meanz)
+                meandata.append(np.average(datasubsample))
+    return uniquedistances,np.asarray(meandata)

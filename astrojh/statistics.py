@@ -5,6 +5,7 @@ import numpy as np
 import scipy.stats as stats
 import statsmodels.api as sm
 from scipy import signal
+from scipy.spatial import distance
 
 def basic_info( arr, sarr=None ):
     """
@@ -144,7 +145,8 @@ def peakfinder( xarr, yarr, **kwargs):
         ypospeaks=[]
     return xpospeaks, ypospeaks
 
-def structurefunction_1d(x, y, order=2, nsamples=None, spacing='linear'):
+def structurefunction_1d(x, y, order=2, nsamples=None, spacing='linear',
+                         irregular=False):
     """
     Computes 1D structure function
 
@@ -160,6 +162,9 @@ def structurefunction_1d(x, y, order=2, nsamples=None, spacing='linear'):
         Frequency over which to sample the structure function (default=2)
     spacing : string
         linear or logarithmic spacing of the xdistances over which to compute SF
+    irregular : Bool (optional)
+        if the spacing of the xaxis is irregular this option will incorporate
+        a tolerance into the distance computation. (Default==False)
     """
 
     if nsamples is None:
@@ -178,19 +183,30 @@ def structurefunction_1d(x, y, order=2, nsamples=None, spacing='linear'):
     structx=structx.astype('int')
     structy=[]
 
+    # if on an irregularly spaced grid then we need to work with
+    # absolute distances and incorporate a tolerance level
+    tolerance = compute_tolerance(x)
+
     # For each distance element over which to compute the SF, compute distance
     # to all pixels - select the relevant ones and compute SF
     for _x in structx:
         diff=[]
         for i in range(len(x)):
             # Find distance between current pixel and all other pixels
-            distances = compute_distance(i,np.arange(len(x)))
-            # select the relevant distance
-            id = np.where(distances==_x)[0]
+            if not irregular:
+                distances = compute_distance(i,np.arange(len(x)))
+                # select the relevant distance
+                id = np.where(distances==_x)[0]
+            else:
+                distances = compute_distance_irregular(x[i], x)
+                id = np.where((distances>=_x-tolerance)&
+                              (distances<=_x+tolerance))[0]
+
             if np.size(id)!=0:
                 originval=y[i]
                 # SF computation
                 diff.extend(np.abs(originval-y[id])**order)
+
         diff=np.asarray(diff)
         # SF is the average measured on a given size scale
         structy.append(np.mean(diff))
@@ -209,3 +225,33 @@ def compute_distance(id, ids):
         all other ids
     """
     return np.abs(id-ids)
+
+def compute_distance_irregular(xpos, x):
+    """
+    Compute the distance between the current value and all other values on an
+    irregularly spaced grid
+
+    Parameters
+    ----------
+    xpos : number
+        Current x position
+    x : ndarray
+        array of x values
+    """
+    return np.abs(xpos-x)
+
+def compute_tolerance(x):
+    """
+    Computes tolerance level for distances in SF analysis. Tolerance is set to
+    half the mean spacing between xvalues
+
+    Parameters
+    ----------
+    x : ndarray
+        array of x values
+
+    """
+    diffarr = np.diff(x)
+    meandiff = np.mean(diffarr)
+    tol = meandiff/2.
+    return tol
