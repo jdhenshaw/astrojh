@@ -78,6 +78,81 @@ def circularmask_img(img, centre=None, radius=None, wcs=None):
     newimg = np.where(mask==1, img, np.NaN)
     return newimg
 
+def annularmask(shape, centre=None, radius=None, width=None, wcs=None):
+    """
+    Creates an annular mask of a certain radius and width around a central
+    location
+
+    Parameters
+    ----------
+    shape : numpy array
+        numpy array containing the shape of the image (y,x)
+    centre : numpy array (optional)
+        numpy array containing centre coordinates in pixel units. If wcs is
+        provided the centre value can be given in map units
+    radius : float (optional)
+        radius of the region to mask
+    width : float (optional)
+        width of the annulus
+    wcs : astropy object
+        world coordinate system information
+
+    """
+    y = int(shape[0])
+    x = int(shape[1])
+    if centre is None: # use the middle of the image
+        centre = [y//2, x//2]
+    if radius is None:
+        radius = min(centre[0], centre[1], x-centre[1], y-centre[0])
+
+    if wcs is not None:
+        if centre is not None:
+            xc, yc = wcs.all_world2pix([centre[1]], [centre[0]], 1)
+            centre = [int(yc), int(xc)]
+
+    Y, X = np.ogrid[:y, :x]
+    dist_from_centre = np.sqrt((X - centre[1])**2 + (Y-centre[0])**2)
+    mask = (dist_from_centre <= radius+width)&(dist_from_centre >= radius-width)
+    return mask
+
+def annularmask_img(img, centre=None, radius=None, width=None, wcs=None):
+    """
+    Creates an annular mask of a certain radius and width around a central
+    location
+
+    Parameters
+    ----------
+    shape : numpy array
+        numpy array containing the shape of the image (y,x)
+    centre : numpy array (optional)
+        numpy array containing centre coordinates in pixel units. If wcs is
+        provided the centre value can be given in map units
+    radius : float (optional)
+        radius of the region to mask
+    width : float (optional)
+        width of the annulus
+    wcs : astropy object
+        world coordinate system information
+
+    """
+    y = int(np.shape(img)[0])
+    x = int(np.shape(img)[1])
+    if centre is None: # use the middle of the image
+        centre = [y//2, x//2]
+    if radius is None:
+        radius = min(centre[0], centre[1], x-centre[1], y-centre[0])
+
+    if wcs is not None:
+        if centre is not None:
+            xc, yc = wcs.all_world2pix([centre[1]], [centre[0]], 1)
+            centre = [int(yc), int(xc)]
+
+    Y, X = np.ogrid[:y, :x]
+    dist_from_centre = np.sqrt((X - centre[1])**2 + (Y-centre[0])**2)
+    mask = (dist_from_centre >= radius-width)&(dist_from_centre <= radius+width)
+    newimg = np.where(mask==1, img, np.NaN)
+    return newimg
+
 def rectmask(shape, centre=None, width=None, wcs=None):
     """
     Accepts a numpy array which includes the shape of the image to be masked,
