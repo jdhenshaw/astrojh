@@ -109,6 +109,9 @@ def annularmask(shape, centre=None, radius=None, width=None, wcs=None):
         if centre is not None:
             xc, yc = wcs.all_world2pix([centre[1]], [centre[0]], 1)
             centre = [int(yc), int(xc)]
+            
+    if width is None:
+        width=1
 
     Y, X = np.ogrid[:y, :x]
     dist_from_centre = np.sqrt((X - centre[1])**2 + (Y-centre[0])**2)
@@ -146,6 +149,9 @@ def annularmask_img(img, centre=None, radius=None, width=None, wcs=None):
         if centre is not None:
             xc, yc = wcs.all_world2pix([centre[1]], [centre[0]], 1)
             centre = [int(yc), int(xc)]
+
+    if width is None:
+        width=1
 
     Y, X = np.ogrid[:y, :x]
     dist_from_centre = np.sqrt((X - centre[1])**2 + (Y-centre[0])**2)
