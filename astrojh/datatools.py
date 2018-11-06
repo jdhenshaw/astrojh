@@ -127,7 +127,8 @@ def average_along_curve(x,y,z, weights=None):
         if np.size(ids) != 0.0:
             zdatasubsample = z[ids]
             if weights is not None:
-                meanz.append(np.average(zdatasubsample, weights=weights))
+                weightssubsample = weights[ids]
+                meanz.append(np.average(zdatasubsample, weights=weightssubsample))
             else:
                 meanz.append(np.average(zdatasubsample))
     return uniquexvals,uniqueyvals,np.asarray(meanz)

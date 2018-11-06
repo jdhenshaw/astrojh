@@ -117,7 +117,7 @@ def fft1d( xarr, yarr, n, d ):
 
     """
     xf = np.fft.fftfreq(n, d=d)
-    yf = np.fft.fft(yarr, n=n)
+    yf = np.fft.fft(yarr-yarr.mean(), n=n)
     xfp = xf[:n//2]
     yfp = np.abs(yf[:n//2])
 
@@ -165,7 +165,7 @@ def structurefunction_1d(x, y, order=2, nsamples=None, spacing='linear'):
     if nsamples is None:
         nsamples = np.size(x)
 
-    # Compute spacing between 1 and np.size(x)//2 elements. 
+    # Compute spacing between 1 and np.size(x)//2 elements.
     if spacing=='linear':
         structx = np.linspace(1, (np.size(x)-1)//2, num=nsamples)
         structx = np.around(structx, decimals=0)
