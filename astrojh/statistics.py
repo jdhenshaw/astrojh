@@ -137,10 +137,9 @@ def peakfinder( xarr, yarr, **kwargs):
 
     """
     peak_info = signal.find_peaks( yarr, **kwargs )
-    #print(peak_info)
     xpospeaks = xarr[peak_info[0]]
     if 'prominences' in peak_info[1]:
-        ypospeaks = yarr[peak_info[0]]#peak_info[1]['prominences']
+        ypospeaks = yarr[peak_info[0]]
     else:
         ypospeaks=[]
     return xpospeaks, ypospeaks
