@@ -6,6 +6,27 @@ import astropy.units as u
 from astropy.units import cds
 from astropy.units import astrophys as ap
 from astropy import constants as const
+from astropy.coordinates import SkyCoord
+from astropy.coordinates import ICRS, Galactic, FK4, FK5
+
+def sexstrgal(ra, dec, frame='fk5'):
+    """
+    Sexagesimal Ra/dec string to Galactic coordinates
+
+    Parameters
+    ----------
+    ra : string
+        Sexagesimal Ra string
+    dec : string
+        Sexagesimal dec string
+    frame : string
+        coordinate frame
+    """
+    coords = SkyCoord(ra, dec, frame=frame, unit=(u.hr, u.deg))
+    coords = coords.transform_to('galactic')
+    lon = coords.l.deg
+    lat = coords.b.deg
+    return lon, lat
 
 def Ntomsd(column_density, mu_p=2.8):
     """
