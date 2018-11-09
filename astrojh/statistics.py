@@ -6,6 +6,7 @@ import scipy.stats as stats
 import statsmodels.api as sm
 from scipy import signal
 from scipy.spatial import distance
+from scipy.interpolate import interp1d
 
 def basic_info( arr, sarr=None ):
     """
@@ -106,7 +107,8 @@ def basic_info( arr, sarr=None ):
         print("")
         print('===============================================================')
 
-def fft1d( xarr, yarr, n, d ):
+def fft1d( xarr, yarr, nsamples=None, sampling=None, irregular=False,
+           kind='linear' ):
     """
     Accepts two 1D arrays (x, y) a sampling spacing and the number of samples
     and computes one-dimensional discrete Fourier Transform.
@@ -117,16 +119,30 @@ def fft1d( xarr, yarr, n, d ):
         array of x values
     yarr : numpy array
         array of y values
-    n : float
-        number of samples
-    d : float
+    nsamples : float (optional)
+        number of samples (default = len(x))
+    sampling : float (optional)
         sampling spacing (frequency on which x values are measured)
+    irregular : bool (optional)
+        if True and the x axis is irregularly sampled - use scipy interpolate to
+        place on a regularly spaced grid
+    kind : string (optional)
+        method for scipy.interpolate (default = linear)
 
     """
-    xf = np.fft.fftfreq(n, d=d)
-    yf = np.fft.fft(yarr-yarr.mean(), n=n)
-    xfp = xf[:n//2]
-    yfp = np.abs(yf[:n//2])
+    if nsamples is None:
+        nsamples = len(xarr)
+    if sampling is None:
+        sampling = np.abs(np.min(xarr)-np.max(xarr))/nsamples
+    if irregular is True:
+        xnew = np.linspace(np.min(xarr), np.max(xarr), nsamples)
+        interp = interp1d(xarr, yarr, kind=kind)
+        yarr = interp(xnew)
+
+    xf = np.fft.fftfreq(nsamples, d=sampling)
+    yf = np.fft.fft(yarr-yarr.mean(), n=nsamples)
+    xfp = xf[:nsamples//2]
+    yfp = np.abs(yf[:nsamples//2])
 
     return xfp, yfp
 
