@@ -108,7 +108,7 @@ def basic_info( arr, sarr=None ):
         print('===============================================================')
 
 def fft1d( xarr, yarr, nsamples=None, sampling=None, irregular=False,
-           kind='linear' ):
+           method='linear' ):
     """
     Accepts two 1D arrays (x, y) a sampling spacing and the number of samples
     and computes one-dimensional discrete Fourier Transform.
@@ -126,8 +126,8 @@ def fft1d( xarr, yarr, nsamples=None, sampling=None, irregular=False,
     irregular : bool (optional)
         if True and the x axis is irregularly sampled - use scipy interpolate to
         place on a regularly spaced grid
-    kind : string (optional)
-        method for scipy.interpolate (default = linear)
+    method : string (optional)
+        method for scipy.interp1d - NB: keyword 'kind' (default = linear)
 
     """
     if nsamples is None:
@@ -136,7 +136,7 @@ def fft1d( xarr, yarr, nsamples=None, sampling=None, irregular=False,
         sampling = np.abs(np.min(xarr)-np.max(xarr))/nsamples
     if irregular is True:
         xnew = np.linspace(np.min(xarr), np.max(xarr), nsamples)
-        interp = interp1d(xarr, yarr, kind=kind)
+        interp = interp1d(xarr, yarr, kind=method)
         yarr = interp(xnew)
 
     xf = np.fft.fftfreq(nsamples, d=sampling)
