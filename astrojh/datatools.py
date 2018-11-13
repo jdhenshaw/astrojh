@@ -78,11 +78,16 @@ def map_to_model(data, model):
 
     """
     maptomodel = np.zeros_like(data[0,:], dtype=int)
+    distancetocurve = np.zeros_like(data[0,:], dtype=float)
+
     for i in range(len(maptomodel)):
-        datapoint = np.array([data[:,i]])
-        distance_to_curve=distance.cdist(datapoint, model.T)[0]
-        maptomodel[i]=int(np.where(distance_to_curve==np.min(distance_to_curve))[0])
-    return maptomodel
+        datapoint = np.array([data[:,i]],dtype=float)
+        distance_to_curve = distance.cdist(datapoint, model.T)[0]
+        distancetocurve[i]=np.min(distance_to_curve)
+
+        idcurve = np.where(distance_to_curve==np.min(distance_to_curve))[0]
+        maptomodel[i]=int(idcurve)
+    return maptomodel, distancetocurve
 
 def distance_along_curve(model, origin=0):
     """

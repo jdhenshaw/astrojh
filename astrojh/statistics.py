@@ -274,5 +274,5 @@ def compute_tolerance(x):
     """
     diffarr = np.diff(x)
     meandiff = np.mean(diffarr)
-    tol = meandiff/2.
+    tol = np.abs(meandiff/2.)
     return tol

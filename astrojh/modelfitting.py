@@ -83,6 +83,86 @@ def residual_straightline(pars, x, y, err=None):
 
     return min
 
+def quadraticfit(x,y,err=None,pinit=None,method='leastsq',report_fit=False):
+    """
+    Fits a quadratic to data
+    Parameters
+    ----------
+    x : ndarray
+        array of x values
+    y : ndarray
+        data to be fit
+    err : ndarray (optional)
+        uncertainties on y data
+    pinit : ndarray (optional)
+        initial guesses for fitting. Format = [mx, c]
+    method : string (optional)
+        method used for the minimisation (default = leastsq)
+
+    """
+    if pinit is None:
+        pars=lmfit.Parameters()
+        pars.add('mmx', value=1.0)
+        pars.add('mx', value=1.0)
+        pars.add('c', value=1.0)
+    else:
+        pars=lmfit.Parameters()
+        pars.add('mmx', value=pinit[0])
+        pars.add('mx', value=pinit[1])
+        pars.add('c', value=pinit[2])
+
+    fitter = lmfit.Minimizer(residual_quadratic, pars,
+                             fcn_args=(x,y),
+                             fcn_kws={'err':err},
+                             nan_policy='propagate')
+
+    result = fitter.minimize(method=method)
+
+    if report_fit:
+        lmfit.report_fit(result)
+
+    popt = np.array([result.params['mmx'].value,
+                     result.params['mx'].value,
+                     result.params['c'].value])
+    perr = np.array([result.params['mmx'].stderr,
+                     result.params['mx'].stderr,
+                     result.params['c'].stderr])
+
+    return popt, perr, result
+
+def residual_quadratic(pars, x, y, err=None):
+    """
+    Minmizer for lmfit for fitting a quadratic
+
+    Parameters
+    ----------
+    pars : lmfit.Parameters()
+
+    x : ndarray
+        array of x positions
+    data : ndarray
+        1-D array containing the data
+    err : ndarray
+        uncertainties on the data
+
+    """
+
+    parvals = pars.valuesdict()
+    mmx = parvals['mmx']
+    mx = parvals['mx']
+    c = parvals['c']
+    model = polynomial_2D(x, mmx, mx, c)
+
+    if y is None:
+        min = np.array([model])
+        return min
+    if err is None:
+        min = np.array([model - y])
+        return min
+    min = np.array([(model-y) / err])
+
+    return min
+
 def planefit(x, y, z, err=None, pinit=None, method='leastsq', report_fit=False):
     """
     Fits a first-degree bivariate polynomial to 2D data
@@ -156,6 +236,101 @@ def residual_planefit(pars, x, y, data=None, err=None):
     my = parvals['my']
     c = parvals['c']
     model = polynomial_plane1D(x, y, mx, my, c)
+
+    if data is None:
+        min = np.array([model])
+        return min
+    if err is None:
+        min = np.array([model - data])
+        return min
+    min = np.array([(model-data) / err])
+
+    return min
+
+def quadratic_planefit(x, y, z, err=None, pinit=None, method='leastsq',
+                      report_fit=False):
+    """
+    Fits a quadratic bivariate polynomial to 2D data
+
+    Parameters
+    ----------
+    x : ndarray
+        array of x values
+    y : ndarray
+        array of y values
+    z : ndarray
+        data to be fit
+    err : ndarray (optional)
+        uncertainties on z data
+    pinit : ndarray (optional)
+        initial guesses for fitting. Format = [mmx, mx, mmy, my, c]
+    method : string (optional)
+        method used for the minimisation (default = leastsq)
+
+    """
+    if pinit is None:
+        pars=lmfit.Parameters()
+        pars.add('mmx', value=1.0)
+        pars.add('mx', value=1.0)
+        pars.add('mmy', value=1.0)
+        pars.add('my', value=1.0)
+        pars.add('c', value=1.0)
+    else:
+        pars=lmfit.Parameters()
+        pars.add('mmx', value=pinit[0])
+        pars.add('mx', value=pinit[1])
+        pars.add('mmy', value=pinit[2])
+        pars.add('my', value=pinit[3])
+        pars.add('c', value=pinit[4])
+
+    fitter = lmfit.Minimizer(residual_quadratic_planefit, pars,
+                             fcn_args=(x,y),
+                             fcn_kws={'data':z, 'err':err},
+                             nan_policy='propagate')
+
+    result = fitter.minimize(method=method)
+
+    if report_fit:
+        lmfit.report_fit(result)
+
+    popt = np.array([result.params['mmx'].value,
+                     result.params['mx'].value,
+                     result.params['mmy'].value,
+                     result.params['my'].value,
+                     result.params['c'].value])
+    perr = np.array([result.params['mmx'].stderr,
+                     result.params['mx'].stderr,
+                     result.params['mmy'].stderr,
+                     result.params['my'].stderr,
+                     result.params['c'].stderr])
+
+    return popt, perr, result
+
+def residual_quadratic_planefit(pars, x, y, data=None, err=None):
+    """
+    Minmizer for lmfit for fitting a quadratic 2-D plane to data
+
+    Parameters
+    ----------
+    pars : lmfit.Parameters()
+
+    x : ndarray
+        array of x positions
+    y : ndarray
+        array of y positions
+    data : ndarray
+        2-D image containing the data
+    err : ndarray
+        uncertainties on the data
+
+    """
+    parvals = pars.valuesdict()
+    mmx = parvals['mmx']
+    mx = parvals['mx']
+    mmy = parvals['mmy']
+    my = parvals['my']
+    c = parvals['c']
+    model = polynomial_plane2D(x, y, mmx, mx, mmy, my, c)
 
     if data is None:
         min = np.array([model])
@@ -284,7 +459,7 @@ def make_spiral(pars,model,project=None, full=True, flip=False, npoints=100):
         number of points for the model
 	"""
     parvals = pars.valuesdict()
-    theta = np.arange(0,180*np.pi/180.,1./npoints)
+    theta = np.arange(0,np.pi,1./npoints)
 
     if model=='RM09':
         r = spiral_RM09(parvals['N'], parvals['B'], parvals['A'], theta)

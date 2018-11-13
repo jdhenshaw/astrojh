@@ -20,6 +20,22 @@ def polynomial_1D(x, mx, c):
     """
     return mx*x + c
 
+def polynomial_2D(x, mmx, mx, c):
+    """
+    Model 2D polynomial
+
+    Parameters
+    ----------
+    x : ndarray
+        array of x values
+    mmx : float
+    mx : float
+    c : float
+        offset
+
+    """
+    return mmx*x**2 + mx*x + c
+
 def polynomial_plane1D(x, y, mx, my, c):
     """
     A 1D polynomial function for 2D data
@@ -39,6 +55,26 @@ def polynomial_plane1D(x, y, mx, my, c):
 
     """
     return mx*x + my*y + c
+
+def polynomial_plane2D(x, y, mmx, mx, mmy, my, c):
+    """
+    Quadratic function for 2D data
+
+    Parameters
+    ----------
+    x : ndarray
+        array of x values
+    y : ndarray
+        array of y values
+    mmx : float
+    mx : float
+    mmy : float
+    my : float
+    c : float
+        offset
+
+    """
+    return mmx*x**2 + mx*x + mmy*y**2 + my*y + c
 
 def sinusoid(x, A, T, p):
     """
