@@ -91,7 +91,8 @@ def map_to_model(data, model):
 
 def distance_along_curve(model, origin=0):
     """
-    Computes the distance along a curve relative to a position on that curve
+    Computes the cumulative distance along a curve relative to a position on
+    that curve
 
     Parameters
     ----------
@@ -101,11 +102,23 @@ def distance_along_curve(model, origin=0):
         index of the origin within the model from which all distances will be
         computed (default=0)
     """
-    distance=np.zeros_like(model[0,:], dtype=float)
-    originpoint=model[:,origin]
+    distance=np.zeros(np.size(model[0,:]), dtype=float)
+
+    if origin==-1:
+        newmodel=model[:,::-1]
+    else:
+        newmodel=model
+
     for i in range(len(model[0,:])):
-        distance[i]+=np.linalg.norm(model[:,i]-originpoint)
-    return distance
+        if i != 0:
+            distance[i]=np.linalg.norm(newmodel[:,i]-newmodel[:,i-1])
+            
+    cumulativedistance=np.cumsum(distance)
+
+    if origin==-1:
+        cumulativedistance=cumulativedistance[::-1]
+
+    return cumulativedistance
 
 def average_along_curve(distances, data, weights=None):
     """
