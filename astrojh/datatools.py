@@ -7,6 +7,7 @@ from astropy.table import Table
 from astropy.table import Column
 from scipy.spatial import distance
 from scipy.spatial import cKDTree
+from scipy.interpolate import interp1d
 
 def create_table(columns, headings, table_name='mytable',
                  outputdir='./', outputfile='mytable.dat',
@@ -37,6 +38,15 @@ def create_table(columns, headings, table_name='mytable',
     mytable.write(outputdir+outputfile, format='ascii', overwrite=overwrite)
 
     return mytable
+
+def interpolate1D(x, y, kind='linear'):
+    """
+    Perform a simple 1D linear interpolation
+    """
+    interp = interp1d(x, y, kind=kind)
+    interpy = interp(x)
+
+    return interpy
 
 def radial_data_selection(data, model, radius):
     """
@@ -112,7 +122,7 @@ def distance_along_curve(model, origin=0):
     for i in range(len(model[0,:])):
         if i != 0:
             distance[i]=np.linalg.norm(newmodel[:,i]-newmodel[:,i-1])
-            
+
     cumulativedistance=np.cumsum(distance)
 
     if origin==-1:

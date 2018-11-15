@@ -7,6 +7,7 @@ import statsmodels.api as sm
 from scipy import signal
 from scipy.spatial import distance
 from scipy.interpolate import interp1d
+from .datatools import interpolate1D
 
 def basic_info( arr, sarr=None ):
     """
@@ -136,8 +137,7 @@ def fft1d( xarr, yarr, nsamples=None, sampling=None, irregular=False,
         sampling = np.abs(np.min(xarr)-np.max(xarr))/nsamples
     if irregular is True:
         xnew = np.linspace(np.min(xarr), np.max(xarr), nsamples)
-        interp = interp1d(xarr, yarr, kind=method)
-        yarr = interp(xnew)
+        yarr = interpolate1D(xnew, yarr, kind=method)
 
     xf = np.fft.fftfreq(nsamples, d=sampling)
     yf = np.fft.fft(yarr-yarr.mean(), n=nsamples)
