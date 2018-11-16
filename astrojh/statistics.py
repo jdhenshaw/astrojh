@@ -8,6 +8,7 @@ from scipy import signal
 from scipy.spatial import distance
 from scipy.interpolate import interp1d
 from .datatools import interpolate1D
+from .masking import *
 
 def basic_info( arr, sarr=None ):
     """
@@ -233,6 +234,28 @@ def structurefunction_1d(x, y, order=2, nsamples=None, spacing='linear',
         structy.append(np.mean(diff))
 
     return structx, np.power(structy, (1./order))
+
+def structurefunction_2d(img, order=2, nsamples=None, spacing='linear',
+                         irregular=False):
+    """
+    Computes 2D structure function
+
+    Parameters
+    ----------
+    img : ndarray
+        2D array - an image containing the data for which you would like to
+        compute the structure function
+    order : number (optional)
+        order of the structure function (default = the size of the x array)
+    nsamples : number (optional)
+        Frequency over which to sample the structure function (default=2)
+    spacing : string
+        linear or logarithmic spacing of the xdistances over which to compute SF
+    irregular : Bool (optional)
+        if the spacing of the xaxis is irregular this option will incorporate
+        a tolerance into the distance computation. (Default==False)
+    """
+
 
 def compute_distance(id, ids):
     """
