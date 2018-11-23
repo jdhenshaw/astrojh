@@ -244,27 +244,66 @@ def structurefunction_2d(img, order=2, max_size=None, nsamples=None,
     """
     Computes 2D structure function
 
-    The program is clunky (annulus mask+compute for all pixels) but its
-    parallelised so not as clunky as it could be.
-
     Parameters
     ----------
     img : ndarray
         2D array - an image containing the data for which you would like to
         compute the structure function
     order : number (optional)
-        order of the structure function (default = the size of the x array)
+        order of the structure function (default=2)
     max_size : number (optional)
         Maximum extent (in pixels) of region over which to compute the structure
         function. Largest scale for SF computation would be max_size/2
     nsamples : number (optional)
-        Frequency over which to sample the structure function (default=2)
+        Frequency over which to sample the structure function
+        (default = the size of the x array)
     spacing : string
         linear or logarithmic spacing of the xdistances over which to compute SF
     width : number (optional)
         width of the annulus over which to compute the SF
     njobs : number (optional)
         parallel processing
+    """
+    # compute the lags for the SF computation
+    lags = compute_lags(img,max_size=max_size,nsamples=nsamples,spacing=spacing)
+    structy=[]
+    errstructy=[]
+
+    # Loop through the lags
+    for lagvalue in ProgressBar(lags):
+        pi = compute_parameterincrements(img,lagvalue,width=width,njobs=njobs)
+
+        # Estimate number of independent measurements = maparea/_x_area - where
+        # map area is given by the number of non NaN pixels in the map and the
+        # _x_area is just the area enclosed by the annulus
+        n_indep = np.size(img[~np.isnan(img)])/(np.pi * lagvalue**2)
+
+        # SF is the average measured on a given size scale
+        structy.append( np.mean( np.abs(pi)**order ) )
+        # the uncertainty on the measurement is taken as the standard error on
+        # the mean, taking into account independent areas
+        std = np.std( np.abs(pi)**order )
+        errstructy.append(std/np.sqrt(n_indep))
+
+    return lags,structy,errstructy
+
+def compute_lags(img, max_size=None, nsamples=None, spacing='linear'):
+    """
+    Computes lags for various computations e.g. structure functionss
+
+    Parameters
+    ----------
+    img : ndarray
+        2D array - an image containing the data for which you would like to
+        compute the structure function
+    max_size : number (optional)
+        Maximum extent (in pixels) of region over which to compute the structure
+        function. Largest scale for SF computation would be max_size/2
+    nsamples : number (optional)
+        Frequency over which to sample the structure function
+        (default = the size of the x array)
+    spacing : string
+        linear or logarithmic spacing of the xdistances over which to compute SF
     """
 
     # Find the maximum half-width of the image excluding any NaNs
@@ -282,9 +321,6 @@ def structurefunction_2d(img, order=2, max_size=None, nsamples=None,
     if max_size is not None:
         extent=max_size
 
-    # also establish coords over which to compute sf
-    xx,yy = np.meshgrid(np.arange(np.shape(img)[1]),np.arange(np.shape(img)[0]))
-
     # set the number of samples
     if nsamples is None:
         nsamples = np.min(np.shape(img))
@@ -295,44 +331,52 @@ def structurefunction_2d(img, order=2, max_size=None, nsamples=None,
         lags = np.around(lags, decimals=0)
         lags = np.unique(lags)
     elif spacing=='log':
-        lags = np.logspace(np.log10(1), np.log10(((extent//2)-1)//2), num=nsamples)
+        lags = np.logspace(np.log10(1),np.log10(((extent//2)-1)//2),num=nsamples)
         lags = np.around(lags, decimals=0)
         lags = np.unique(lags)
-    structy=[]
-    errstructy=[]
+
+    return lags
+
+def compute_parameterincrements( img, lagvalue, width=1, njobs=1 ):
+    """
+    Parallelised computation of parameter increments. Returns an array of values
+    corresponding to the parameter increment given as
+
+    delta P = P(r)-P(r+l)
+
+    where P is the parameter you're interested in, r is some position in the map
+    and l is some lag value
+
+    Computation is performed by shifting the map and subtracting the whole
+    image which makes for extremely fast computation
+
+    Parameters
+    ----------
+    img : ndarray
+        2D array - an image containing the data for which you would like to
+        compute the structure function
+    lagvalue : number
+        distance over which to compute structure function
+    width : number (optional)
+        width of the annulus over which to compute the SF
+    njobs : number (optional)
+        parallel processing
+    """
 
     reference = [np.shape(img)[0]//2, np.shape(img)[1]//2]
-    # Loop through the lags
-    for _x in ProgressBar(lags):
-        diff=[]
-        radius = _x # distance over which SF is being computed
+    # create a mask
+    mask = annularmask(np.shape(img),centre=reference,radius=lagvalue,width=width)
+    maskids = mask_ids(mask, reference=reference, remove_zero=True)
 
-        # Estimate number of independent measurements = maparea/_x_area - where
-        # map area is given by the number of non NaN pixels in the map and the
-        # _x_area is just the area enclosed by the annulus
-        n_indep = np.size(img[~np.isnan(img)])/(np.pi * _x**2)
+    # Parallel processing of parameter increments
+    args = [img,lagvalue]
+    inputvalues = [[maskid]+args for maskid in maskids ]
+    pivals = parallel_map(parallelpi, inputvalues, numcores=njobs)
+    flatpi = [value for pivs in pivals for value in pivs]
+    # Convert to an array
+    flatpi = np.asarray(flatpi)
 
-        # create a mask
-        mask = annularmask(np.shape(img),centre=reference,radius=radius,
-                                                                    width=width)
-        maskids = mask_ids(mask, reference=reference, remove_zero=True)
-
-        # Parallel processing of parameter increments
-        args = [img,radius]
-        inputvalues = [[maskid]+args for maskid in maskids ]
-        imgdiff = parallel_map(parallelpi, inputvalues, numcores=njobs)
-        flatpi = [value for diff in imgdiff for value in diff]
-        # Convert to an array
-        flatpi = np.asarray(flatpi)
-
-        # SF is the average measured on a given size scale
-        structy.append( np.mean( np.abs(flatpi)**order ) )
-        # the uncertainty on the measurement is taken as the standard error on
-        # the mean, taking into account independent areas
-        std = np.std( np.abs(flatpi)**order )
-        errstructy.append(std/np.sqrt(n_indep))
-
-    return lags,structy,errstructy
+    return flatpi
 
 def parallelpi(inputvalues):
     """
@@ -350,7 +394,7 @@ def parallelpi(inputvalues):
     Parameters
     ----------
     inputvalues : list
-        Combination
+        Combination of img, radius, and ids
 
     """
     #inputvalues = inputvalues[0]
