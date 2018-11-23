@@ -9,6 +9,9 @@ from scipy.spatial import distance
 from scipy.interpolate import interp1d
 from .datatools import interpolate1D
 from .masking import *
+import itertools
+from astropy.utils.console import ProgressBar
+from .parallel_map import *
 
 def basic_info( arr, sarr=None ):
     """
@@ -235,10 +238,13 @@ def structurefunction_1d(x, y, order=2, nsamples=None, spacing='linear',
 
     return structx, np.power(structy, (1./order))
 
-def structurefunction_2d(img, order=2, nsamples=None, spacing='linear',
-                         irregular=False):
+def structurefunction_2d(img, order=2, max_size=None, nsamples=None,
+                         spacing='linear', irregular=False, width=1, njobs=1):
     """
     Computes 2D structure function
+
+    The program is clunky (annulus mask+compute for all pixels) but its
+    parallelised so not as clunky as it could be.
 
     Parameters
     ----------
@@ -247,15 +253,111 @@ def structurefunction_2d(img, order=2, nsamples=None, spacing='linear',
         compute the structure function
     order : number (optional)
         order of the structure function (default = the size of the x array)
+    max_size : number (optional)
+        Maximum extent (in pixels) of region over which to compute the structure
+        function. Largest scale for SF computation would be max_size/2
     nsamples : number (optional)
         Frequency over which to sample the structure function (default=2)
     spacing : string
         linear or logarithmic spacing of the xdistances over which to compute SF
-    irregular : Bool (optional)
-        if the spacing of the xaxis is irregular this option will incorporate
-        a tolerance into the distance computation. (Default==False)
+    width : number (optional)
+        width of the annulus over which to compute the SF
+    njobs : number (optional)
+        parallel processing
     """
 
+    # Find the maximum half-width of the image excluding any NaNs
+    if np.any(np.isnan(img)):
+        idx,idy = np.where(~np.isnan(img))
+        if (np.size(idx)==0) or (np.size(idy)==0):
+            raise ValueError("Image is exclusively made up of NaNs")
+        else:
+            extentx=np.abs(np.min(idx)-np.max(idx))
+            extenty=np.abs(np.min(idy)-np.max(idy))
+            extent = np.min([extentx, extenty])
+    else:
+        extent = np.min(np.shape(img))
+
+    if max_size is not None:
+        extent=max_size
+
+    # also establish coords over which to compute sf
+    xx,yy = np.meshgrid(np.arange(np.shape(img)[1]),np.arange(np.shape(img)[0]))
+
+    # set the number of samples
+    if nsamples is None:
+        nsamples = np.min(np.shape(img))
+
+    # Compute spacing between 1 and np.size(x)//2 elements.
+    if spacing=='linear':
+        structx = np.linspace(1, ((extent//2)-1)//2, num=nsamples)
+        structx = np.around(structx, decimals=0)
+        structx = np.unique(structx)
+    elif spacing=='log':
+        structx = np.logspace(np.log10(1), np.log10(((extent//2)-1)//2), num=nsamples)
+        structx = np.around(structx, decimals=0)
+        structx = np.unique(structx)
+    structy=[]
+
+    # For each distance element over which to compute the SF, compute distance
+    # to all pixels - select the relevant ones and compute SF
+    for _x in ProgressBar(structx):
+        diff=[]
+        radius = _x # distance over which SF is being computed
+        args = [img,radius,width,order]
+        inputvalues = [[[_xx,_yy]]+args for _xx, _yy in
+                                 itertools.product(np.arange(np.shape(img)[1]),\
+                                                   np.arange(np.shape(img)[0]))]
+
+        sf = parallel_map(sf2d, inputvalues, numcores=njobs)
+        # Flatten the output from parallelisation
+        if np.any(np.isnan(img)):
+            # If there are nans, we need to get rid of these first
+            _flatsf = [value for sfvals in sf for value in sfvals if not np.any(~np.isfinite(value))]
+            flatsf = [value for sfvals in _flatsf for value in sfvals]
+        else:
+            flatsf = [value for sfvals in sf for value in sfvals]
+
+        # Convert to an array
+        flatsf = np.asarray(flatsf)
+        # SF is the average measured on a given size scale
+        structy.append(np.mean(flatsf))
+
+    return structx, np.power(structy, (1./order))
+
+def sf2d(inputvalues):
+    """
+    Parallelised structure function computation. Returns a
+
+    Parameters
+    ----------
+    inputvalues : list
+        Combination of the pixel positions, the image, radius, width, and order
+        for the SF computation
+
+    """
+    # unpack inputs
+    ids, img, radius, width, order = inputvalues
+    # create a copy of the data
+    imgcopy = np.copy(img)
+    # if a pixel has a non-NaN value - use it as a focal point for SF
+    # computation
+    if ~np.isnan(img[ids[1],ids[0]]):
+        # annulus properties
+        centre = [ids[1],ids[0]] # current pixel
+        centreval = img[ids[1],ids[0]] # value of centre pixel
+        # mask the data
+        imgcopy = annularmask_img(imgcopy,
+                                      centre=centre, radius=radius, width=width)
+        # select non-NaN values
+        values = np.array(imgcopy[~np.isnan(imgcopy)])
+        # compute sf
+        _sf = np.abs(centreval-values)**order
+        # remove zero values
+        _sf = _sf[(_sf != 0.0)]
+    else:
+        _sf=np.array([np.NaN])
+    return _sf
 
 def compute_distance(id, ids):
     """

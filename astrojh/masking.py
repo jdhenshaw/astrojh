@@ -109,7 +109,7 @@ def annularmask(shape, centre=None, radius=None, width=None, wcs=None):
         if centre is not None:
             xc, yc = wcs.all_world2pix([centre[1]], [centre[0]], 1)
             centre = [int(yc), int(xc)]
-            
+
     if width is None:
         width=1
 
