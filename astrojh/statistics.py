@@ -12,6 +12,7 @@ from .masking import *
 import itertools
 from astropy.utils.console import ProgressBar
 from .parallel_map import *
+from scipy.ndimage.interpolation import shift
 
 def basic_info( arr, sarr=None ):
     """
@@ -239,7 +240,7 @@ def structurefunction_1d(x, y, order=2, nsamples=None, spacing='linear',
     return structx, np.power(structy, (1./order))
 
 def structurefunction_2d(img, order=2, max_size=None, nsamples=None,
-                         spacing='linear', irregular=False, width=1, njobs=1):
+                         spacing='linear', width=1, njobs=1):
     """
     Computes 2D structure function
 
@@ -290,19 +291,19 @@ def structurefunction_2d(img, order=2, max_size=None, nsamples=None,
 
     # Compute spacing between 1 and np.size(x)//2 elements.
     if spacing=='linear':
-        structx = np.linspace(1, ((extent//2)-1)//2, num=nsamples)
-        structx = np.around(structx, decimals=0)
-        structx = np.unique(structx)
+        lags = np.linspace(1, ((extent//2)-1)//2, num=nsamples)
+        lags = np.around(lags, decimals=0)
+        lags = np.unique(lags)
     elif spacing=='log':
-        structx = np.logspace(np.log10(1), np.log10(((extent//2)-1)//2), num=nsamples)
-        structx = np.around(structx, decimals=0)
-        structx = np.unique(structx)
+        lags = np.logspace(np.log10(1), np.log10(((extent//2)-1)//2), num=nsamples)
+        lags = np.around(lags, decimals=0)
+        lags = np.unique(lags)
     structy=[]
     errstructy=[]
 
     # For each distance element over which to compute the SF, compute distance
     # to all pixels - select the relevant ones and compute SF
-    for _x in ProgressBar(structx):
+    for _x in ProgressBar(lags):
         diff=[]
         radius = _x # distance over which SF is being computed
 
@@ -335,11 +336,12 @@ def structurefunction_2d(img, order=2, max_size=None, nsamples=None,
         std = np.std(np.abs(flatsf))
         errstructy.append(std/np.sqrt(n_indep))
 
-    return structx,structy,errstructy
+    return lags,structy,errstructy
 
 def sf2d(inputvalues):
     """
-    Parallelised structure function computation. Returns a
+    Parallelised structure function computation. Returns an array of values
+    corresponding to the structure function magnitude
 
     Parameters
     ----------
