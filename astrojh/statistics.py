@@ -298,12 +298,19 @@ def structurefunction_2d(img, order=2, max_size=None, nsamples=None,
         structx = np.around(structx, decimals=0)
         structx = np.unique(structx)
     structy=[]
+    errstructy=[]
 
     # For each distance element over which to compute the SF, compute distance
     # to all pixels - select the relevant ones and compute SF
     for _x in ProgressBar(structx):
         diff=[]
         radius = _x # distance over which SF is being computed
+
+        # Estimate number of independent measurements = maparea/_x_area - where
+        # map area is given by the number of non NaN pixels in the map and the
+        # _x_area is just the area enclosed by the annulus
+        n_indep = np.size(img[~np.isnan(img)])/(np.pi * _x**2)
+
         args = [img,radius,width,order]
         inputvalues = [[[_xx,_yy]]+args for _xx, _yy in
                                  itertools.product(np.arange(np.shape(img)[1]),\
@@ -313,7 +320,8 @@ def structurefunction_2d(img, order=2, max_size=None, nsamples=None,
         # Flatten the output from parallelisation
         if np.any(np.isnan(img)):
             # If there are nans, we need to get rid of these first
-            _flatsf = [value for sfvals in sf for value in sfvals if not np.any(~np.isfinite(value))]
+            _flatsf = [value for sfvals in sf for value in sfvals if not \
+                                                    np.any(~np.isfinite(value))]
             flatsf = [value for sfvals in _flatsf for value in sfvals]
         else:
             flatsf = [value for sfvals in sf for value in sfvals]
@@ -322,8 +330,12 @@ def structurefunction_2d(img, order=2, max_size=None, nsamples=None,
         flatsf = np.asarray(flatsf)
         # SF is the average measured on a given size scale
         structy.append(np.mean(flatsf))
+        # the uncertainty on the measurement is taken as the standard error on
+        # the mean, taking into account independent areas
+        std = np.std(np.abs(flatsf))
+        errstructy.append(std/np.sqrt(n_indep))
 
-    return structx, np.power(structy, (1./order))
+    return structx,structy,errstructy
 
 def sf2d(inputvalues):
     """
