@@ -301,8 +301,8 @@ def structurefunction_2d(img, order=2, max_size=None, nsamples=None,
     structy=[]
     errstructy=[]
 
-    # For each distance element over which to compute the SF, compute distance
-    # to all pixels - select the relevant ones and compute SF
+    reference = [np.shape(img)[0]//2, np.shape(img)[1]//2]
+    # Loop through the lags
     for _x in ProgressBar(lags):
         diff=[]
         radius = _x # distance over which SF is being computed
@@ -312,66 +312,68 @@ def structurefunction_2d(img, order=2, max_size=None, nsamples=None,
         # _x_area is just the area enclosed by the annulus
         n_indep = np.size(img[~np.isnan(img)])/(np.pi * _x**2)
 
-        args = [img,radius,width,order]
-        inputvalues = [[[_xx,_yy]]+args for _xx, _yy in
-                                 itertools.product(np.arange(np.shape(img)[1]),\
-                                                   np.arange(np.shape(img)[0]))]
+        # create a mask
+        mask = annularmask(np.shape(img),centre=reference,radius=radius,
+                                                                    width=width)
+        maskids = mask_ids(mask, reference=reference, remove_zero=True)
 
-        sf = parallel_map(sf2d, inputvalues, numcores=njobs)
-        # Flatten the output from parallelisation
-        if np.any(np.isnan(img)):
-            # If there are nans, we need to get rid of these first
-            _flatsf = [value for sfvals in sf for value in sfvals if not \
-                                                    np.any(~np.isfinite(value))]
-            flatsf = [value for sfvals in _flatsf for value in sfvals]
-        else:
-            flatsf = [value for sfvals in sf for value in sfvals]
-
+        # Parallel processing of parameter increments
+        args = [img,radius]
+        inputvalues = [[maskid]+args for maskid in maskids ]
+        imgdiff = parallel_map(parallelpi, inputvalues, numcores=njobs)
+        flatpi = [value for diff in imgdiff for value in diff]
         # Convert to an array
-        flatsf = np.asarray(flatsf)
+        flatpi = np.asarray(flatpi)
+
         # SF is the average measured on a given size scale
-        structy.append(np.mean(flatsf))
+        structy.append( np.mean( np.abs(flatpi)**order ) )
         # the uncertainty on the measurement is taken as the standard error on
         # the mean, taking into account independent areas
-        std = np.std(np.abs(flatsf))
+        std = np.std( np.abs(flatpi)**order )
         errstructy.append(std/np.sqrt(n_indep))
 
     return lags,structy,errstructy
 
-def sf2d(inputvalues):
+def parallelpi(inputvalues):
     """
-    Parallelised structure function computation. Returns an array of values
-    corresponding to the structure function magnitude
+    Parallelised computation of parameter increments. Returns an array of values
+    corresponding to the parameter increment given as
+
+    delta P = P(r)-P(r+l)
+
+    where P is the parameter you're interested in, r is some position in the map
+    and l is some lag value
+
+    Computation is performed by shifting the map and subtracting the whole
+    image which makes for extremely fast computation
 
     Parameters
     ----------
     inputvalues : list
-        Combination of the pixel positions, the image, radius, width, and order
-        for the SF computation
+        Combination
 
     """
+    #inputvalues = inputvalues[0]
+    dumbvalue = -1e10
     # unpack inputs
-    ids, img, radius, width, order = inputvalues
-    # create a copy of the data
+    maskid, img, radius = inputvalues
+    maskidx = maskid[1]
+    maskidy = maskid[0]
+
+    # create a copy of the image and fill it with stupid values instead of NaN
     imgcopy = np.copy(img)
-    # if a pixel has a non-NaN value - use it as a focal point for SF
-    # computation
-    if ~np.isnan(img[ids[1],ids[0]]):
-        # annulus properties
-        centre = [ids[1],ids[0]] # current pixel
-        centreval = img[ids[1],ids[0]] # value of centre pixel
-        # mask the data
-        imgcopy = annularmask_img(imgcopy,
-                                      centre=centre, radius=radius, width=width)
-        # select non-NaN values
-        values = np.array(imgcopy[~np.isnan(imgcopy)])
-        # compute sf
-        _sf = np.abs(centreval-values)**order
-        # remove zero values
-        _sf = _sf[(_sf != 0.0)]
-    else:
-        _sf=np.array([np.NaN])
-    return _sf
+    imgcopy[np.isnan(imgcopy)]=dumbvalue
+
+    #begin by shifting the image
+    imgshift = shift(imgcopy, [maskidy,maskidx], cval=dumbvalue)
+    # Get rid of the dumb values
+    imgshift[((imgshift>=(dumbvalue-100.))&(imgshift<=(dumbvalue+100.)))]=np.NaN
+    # compute difference between the two images
+    imgdiff = img-imgshift
+    # remove zeros and nans values
+    imgdiff = imgdiff[(imgdiff != 0.0) & (~np.isnan(imgdiff))]
+
+    return imgdiff
 
 def compute_distance(id, ids):
     """

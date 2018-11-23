@@ -271,7 +271,7 @@ def rectmask_img(img, centre=None, width=None, wcs=None):
 
     return newimg
 
-def mask_ids(mask, reference=np.array([0,0])):
+def mask_ids(mask, reference=np.array([0,0]), remove_zero=False):
     """
     Reads in a mask and returns the indices where the mask is true relative to
     a reference point
@@ -287,6 +287,14 @@ def mask_ids(mask, reference=np.array([0,0])):
     idx, idy = np.where(mask==True)
     idx = idx-reference[1]
     idy = idy-reference[0]
-    ids = np.array([idx, idy]).T
-    
+
+    if remove_zero:
+        ids = np.array([idx, idy]).T
+        zero = np.where((ids[:,0]==0)&(ids[:,1]==0))[0]
+        if np.size(zero!=0):
+            ids = [ids[i,:] for i in np.arange(len(ids[:,0])) if i != zero]
+            ids = np.asarray(ids)
+    else:
+        ids = np.array([idx, idy]).T
+
     return ids
