@@ -13,6 +13,8 @@ import itertools
 from astropy.utils.console import ProgressBar
 from .parallel_map import *
 from scipy.ndimage.interpolation import shift
+import os
+from astropy.io import fits
 
 def basic_info( arr, sarr=None ):
     """
@@ -171,8 +173,7 @@ def peakfinder( xarr, yarr, **kwargs):
         ypospeaks=[]
     return xpospeaks, ypospeaks
 
-def structurefunction_1d(x, y, order=2, nsamples=None, spacing='linear',
-                         irregular=False):
+def sf1d(x, y, order=2, nsamples=None, spacing='linear', irregular=False):
     """
     Computes 1D structure function
 
@@ -239,105 +240,97 @@ def structurefunction_1d(x, y, order=2, nsamples=None, spacing='linear',
 
     return structx, np.power(structy, (1./order))
 
-def structurefunction_2d(img, order=2, max_size=None, nsamples=None,
-                         spacing='linear', width=1, njobs=1):
+def PImaps(img, header, scale_range=None, stepsize=None, spacing='linear', width=1,
+           njobs=1, outputdir='./', filenameprefix='param_increments',
+           return_map=True, write_fits=True, write_stddev=False,
+           write_nmeas=False, sf=False, order=2):
     """
-    Computes 2D structure function
+    Computes map of parameter increments
+
+    delta P = P(r)-P(r+l)
+
+    where P is the parameter you're interested in, r is some position in the map
+    and l is some lag value
+
+    Will create a series of maps for each lag value as well as standard
+    deviation and n measurement maps (if requested). These will be output as
+    fits files with the same header as the image.
 
     Parameters
     ----------
     img : ndarray
         2D array - an image containing the data for which you would like to
         compute the structure function
-    order : number (optional)
-        order of the structure function (default=2)
-    max_size : number (optional)
-        Maximum extent (in pixels) of region over which to compute the structure
-        function. Largest scale for SF computation would be max_size/2
-    nsamples : number (optional)
-        Frequency over which to sample the structure function
-        (default = the size of the x array)
+    header : FITS header
+        FITS header for the image
+    scale_range : array like (optional)
+        range over which to compute the lags. Should be given as
+        scale_range=[lower, upper]
+    stepsize : number (optional)
+        stepsize over which to compute the lags.
     spacing : string
         linear or logarithmic spacing of the xdistances over which to compute SF
     width : number (optional)
         width of the annulus over which to compute the SF
     njobs : number (optional)
         parallel processing
+    outputdir : string (optional)
+        output directory for the images (default = current directory )
+    filenameprefix : string (optional)
+        prefix for the output file names - will be followed by the lag size and
+        '.fits'
+    return_map : bool (optional)
+        If true, returns a map of the parameter increments. If false - returns
+        a 1D array
+    write_fits : bool (optional)
+        If you wish to write the output to fits format (default = True)
+    write_stddev : bool (optional)
+        creates a stddev map as well as the PImap (default = False)
+    write_nmeas : bool (optional)
+        creates an n measurement map as well as the PImap (default = False)
+    sf : bool (optional)
+        used for creating a structure function map (default = False)
+    order : number (optional)
+        used for creating a structure function map (default = 2)
     """
-    # compute the lags for the SF computation
-    lags = compute_lags(img,max_size=max_size,nsamples=nsamples,spacing=spacing)
-    structy=[]
-    errstructy=[]
+    # compute the lags
+    lags = compute_lags(img, scale_range=scale_range, stepsize=stepsize,
+                        spacing=spacing)
 
+    pilist = []
     # Loop through the lags
     for lagvalue in ProgressBar(lags):
-        pi = compute_parameterincrements(img,lagvalue,width=width,njobs=njobs)
+        pi = compute_parameterincrements(img,lagvalue,width=width,njobs=njobs,
+                                         return_map=return_map,
+                                         sf=sf, order=order)
+        # add it to the list
+        pilist.append(pi)
 
-        # Estimate number of independent measurements = maparea/_x_area - where
-        # map area is given by the number of non NaN pixels in the map and the
-        # _x_area is just the area enclosed by the annulus
-        n_indep = np.size(img[~np.isnan(img)])/(np.pi * lagvalue**2)
+        if write_fits:
+            # check to see if outdirectory exists and if not, create it
+            if not os.path.exists(outputdir):
+                os.makedirs(outputdir)
 
-        # SF is the average measured on a given size scale
-        structy.append( np.mean( np.abs(pi)**order ) )
-        # the uncertainty on the measurement is taken as the standard error on
-        # the mean, taking into account independent areas
-        std = np.std( np.abs(pi)**order )
-        errstructy.append(std/np.sqrt(n_indep))
+            hdu = fits.PrimaryHDU(pi[0], header=header)
+            hdu.writeto(outputdir+filenameprefix+'_'+str(lagvalue)+'.fits',
+                        overwrite=True)
 
-    return lags,structy,errstructy
+            if write_stddev:
+                hdu = fits.PrimaryHDU(pi[1], header=header)
+                hdu.writeto(outputdir+filenameprefix+'_'+str(lagvalue)+'_stddev.fits',
+                            overwrite=True)
+            if write_nmeas:
+                hdu = fits.PrimaryHDU(pi[2], header=header)
+                hdu.writeto(outputdir+filenameprefix+'_'+str(lagvalue)+'_nmeas.fits',
+                            overwrite=True)
 
-def compute_lags(img, max_size=None, nsamples=None, spacing='linear'):
-    """
-    Computes lags for various computations e.g. structure functionss
+    # Return the combined array
+    piarr = np.asarray(pilist)
 
-    Parameters
-    ----------
-    img : ndarray
-        2D array - an image containing the data for which you would like to
-        compute the structure function
-    max_size : number (optional)
-        Maximum extent (in pixels) of region over which to compute the structure
-        function. Largest scale for SF computation would be max_size/2
-    nsamples : number (optional)
-        Frequency over which to sample the structure function
-        (default = the size of the x array)
-    spacing : string
-        linear or logarithmic spacing of the xdistances over which to compute SF
-    """
+    return lags, piarr
 
-    # Find the maximum half-width of the image excluding any NaNs
-    if np.any(np.isnan(img)):
-        idx,idy = np.where(~np.isnan(img))
-        if (np.size(idx)==0) or (np.size(idy)==0):
-            raise ValueError("Image is exclusively made up of NaNs")
-        else:
-            extentx=np.abs(np.min(idx)-np.max(idx))
-            extenty=np.abs(np.min(idy)-np.max(idy))
-            extent = np.min([extentx, extenty])
-    else:
-        extent = np.min(np.shape(img))
-
-    if max_size is not None:
-        extent=max_size
-
-    # set the number of samples
-    if nsamples is None:
-        nsamples = np.min(np.shape(img))
-
-    # Compute spacing between 1 and np.size(x)//2 elements.
-    if spacing=='linear':
-        lags = np.linspace(1, ((extent//2)-1)//2, num=nsamples)
-        lags = np.around(lags, decimals=0)
-        lags = np.unique(lags)
-    elif spacing=='log':
-        lags = np.logspace(np.log10(1),np.log10(((extent//2)-1)//2),num=nsamples)
-        lags = np.around(lags, decimals=0)
-        lags = np.unique(lags)
-
-    return lags
-
-def compute_parameterincrements( img, lagvalue, width=1, njobs=1 ):
+def compute_parameterincrements( img, lagvalue, width=1, njobs=1,
+                                 return_map=False, sf=False, order=2 ):
     """
     Parallelised computation of parameter increments. Returns an array of values
     corresponding to the parameter increment given as
@@ -361,6 +354,10 @@ def compute_parameterincrements( img, lagvalue, width=1, njobs=1 ):
         width of the annulus over which to compute the SF
     njobs : number (optional)
         parallel processing
+    sf : bool (optional)
+        used for creating a structure function map (default = False)
+    order : number (optional)
+        used for creating a structure function map (default = 2)
     """
 
     reference = [np.shape(img)[0]//2, np.shape(img)[1]//2]
@@ -369,14 +366,60 @@ def compute_parameterincrements( img, lagvalue, width=1, njobs=1 ):
     maskids = mask_ids(mask, reference=reference, remove_zero=True)
 
     # Parallel processing of parameter increments
-    args = [img,lagvalue]
+    args = [img,lagvalue,return_map]
     inputvalues = [[maskid]+args for maskid in maskids ]
-    pivals = parallel_map(parallelpi, inputvalues, numcores=njobs)
-    flatpi = [value for pivs in pivals for value in pivs]
-    # Convert to an array
-    flatpi = np.asarray(flatpi)
+    pimaps = parallel_map(parallelpi, inputvalues, numcores=njobs)
 
-    return flatpi
+    if return_map:
+        maps = np.asarray(pimaps)
+        # create an empty array to hold the maps
+        nmap = np.zeros(np.shape(maps[0]), dtype='float')
+        # create the average and standard deviation maps
+        if not sf:
+            avmap = np.nanmean(maps, axis=0)
+            stdmap = np.nanstd(maps, axis=0)
+        else:
+            avmap = np.nanmean((np.abs(maps))**order, axis=0)
+            stdmap = np.nanstd((np.abs(maps))**order, axis=0)
+
+        # create nmeasurement map
+
+        # loop over each map
+        for i in range(len(maps[:,0,0])):
+            # create a map of ones to add to the n map
+            nmapindiv=np.ones(np.shape(maps[i]), dtype='float')
+            # identify where the maps have infinite values
+            idnan = np.where(np.isnan(maps[i]))
+            # set those locations = 0.0
+            nmapindiv[idnan] = 0.0
+            # add maps together
+            nmap+=nmapindiv
+
+        # bundle everything up to return
+        pi = np.array([avmap, stdmap, nmap])
+    else:
+        pivals = [value for pivs in pimaps for value in pivs]
+
+        if sf:
+            # Estimate number of independent measurements
+            outerradius = lagvalue+width
+            innerradius = lagvalue-width
+            annulusarea = (np.pi * ((outerradius**2)-(innerradius**2)))
+            # independent measures
+            n_indep = np.size(img[~np.isnan(img)])/annulusarea
+
+            sf = np.nanmean( np.abs(pivals)**order )
+            # the uncertainty on the measurement is taken as the standard error on
+            # the mean, taking into account independent areas
+            std = np.nanstd( np.abs(pivals)**order )
+            errsf = std/np.sqrt(n_indep)
+            
+            pi = [sf,std,errsf]
+
+        # Convert to an array
+        pi = np.asarray(pi)
+
+    return pi
 
 def parallelpi(inputvalues):
     """
@@ -400,7 +443,7 @@ def parallelpi(inputvalues):
     #inputvalues = inputvalues[0]
     dumbvalue = -1e10
     # unpack inputs
-    maskid, img, radius = inputvalues
+    maskid, img, radius, return_map = inputvalues
     maskidx = maskid[1]
     maskidy = maskid[0]
 
@@ -408,16 +451,157 @@ def parallelpi(inputvalues):
     imgcopy = np.copy(img)
     imgcopy[np.isnan(imgcopy)]=dumbvalue
 
-    #begin by shifting the image
+    # begin by shifting the image
     imgshift = shift(imgcopy, [maskidy,maskidx], cval=dumbvalue)
     # Get rid of the dumb values
-    imgshift[((imgshift>=(dumbvalue-100.))&(imgshift<=(dumbvalue+100.)))]=np.NaN
+    iddumb = np.where((imgshift>=(dumbvalue-200.))&
+                      (imgshift<=(dumbvalue+200.)))
+
+    imgshift[iddumb]=np.NaN
     # compute difference between the two images
     imgdiff = img-imgshift
-    # remove zeros and nans values
-    imgdiff = imgdiff[(imgdiff != 0.0) & (~np.isnan(imgdiff))]
+
+    if not return_map:
+        imgdiff=imgdiff[~np.isnan(imgdiff)]
 
     return imgdiff
+
+def sf2d(img, order=2, scale_range=None, stepsize=None, spacing='linear', width=1,
+         njobs=1):
+    """
+    Computes 2D structure function
+
+    Parameters
+    ----------
+    img : ndarray
+        2D array - an image containing the data for which you would like to
+        compute the structure function
+    order : number (optional)
+        order of the structure function (default=2)
+    scale_range : array like (optional)
+        range over which to compute the lags. Should be given as
+        scale_range=[lower, upper]
+    stepsize : number (optional)
+        stepsize over which to compute the lags.
+    spacing : string
+        linear or logarithmic spacing of the xdistances over which to compute SF
+    width : number (optional)
+        width of the annulus over which to compute the SF
+    njobs : number (optional)
+        parallel processing
+    """
+    lags, sf = PImaps(img, None, scale_range=scale_range, stepsize=stepsize,
+                      spacing=spacing, width=width, njobs=njobs,
+                      return_map=False, write_fits=False, sf=True, order=order)
+
+    return lags, sf[:,0], sf[:,2]
+
+def sf2d_maps(img, header, order=2, scale_range=None, stepsize=None,
+              spacing='linear', width=1, njobs=1,
+              outputdir='./', filenameprefix='sf',
+              return_map=True, write_fits=True, write_stddev=False,
+              write_nmeas=False):
+    """
+    Computes 2D structure function
+
+    Parameters
+    ----------
+    img : ndarray
+        2D array - an image containing the data for which you would like to
+        compute the structure function
+    order : number (optional)
+        order of the structure function (default=2)
+    scale_range : array like (optional)
+        range over which to compute the lags. Should be given as
+        scale_range=[lower, upper]
+    stepsize : number (optional)
+        stepsize over which to compute the lags.
+    spacing : string
+        linear or logarithmic spacing of the xdistances over which to compute SF
+    width : number (optional)
+        width of the annulus over which to compute the SF
+    njobs : number (optional)
+        parallel processing
+    outputdir : string (optional)
+        output directory for the images (default = current directory )
+    filenameprefix : string (optional)
+        prefix for the output file names - will be followed by the lag size and
+        '.fits'
+    return_map : bool (optional)
+        If true, returns a map of the parameter increments. If false - returns
+        a 1D array
+    write_fits : bool (optional)
+        If you wish to write the output to fits format (default = True)
+    write_stddev : bool
+        creates a stddev map as well as the PImap (default = False)
+    write_nmeas : bool
+        creates an n measurement map as well as the PImap (default = False)
+    """
+    lags, sf = PImaps(img, None, scale_range=scale_range, stepsize=stepsize,
+                      spacing=spacing, width=width, njobs=njobs,
+                      return_map=True,write_fits=write_fits,outputdir=outputdir,
+                      filenameprefix=filenameprefix, write_stddev=write_stddev,
+                      write_nmeas=write_nmeas, sf=True, order=order)
+
+    return lags, sf
+
+def compute_lags(img, scale_range=None, stepsize=None, spacing='linear'):
+    """
+    Computes lags for various computations e.g. structure functionss
+
+    Parameters
+    ----------
+    img : ndarray
+        2D array - an image containing the data for which you would like to
+        compute the structure function
+    scale_range : array like (optional)
+        range over which to compute the lags. Should be given as
+        scale_range=[lower, upper]
+    stepsize : number (optional)
+        stepsize over which to compute the lags.
+    spacing : string
+        linear or logarithmic spacing of the xdistances over which to compute SF
+    """
+
+    # Select the upper and lower limits for fitting
+    if scale_range is not None:
+        if np.size(scale_range)!=2:
+            raise ValueError("Please give both a lower and upper limit in the form scale_range=[low,upp]")
+        else:
+            low=scale_range[0]
+            upp=scale_range[1]
+    # If the user does not provide a range - select the maximum according to
+    # either the map or data
+    else:
+        if np.any(np.isnan(img)):
+            idx,idy = np.where(~np.isnan(img))
+            if (np.size(idx)==0) or (np.size(idy)==0):
+                raise ValueError("Image is exclusively made up of NaNs")
+            else:
+                extentx=np.abs(np.min(idx)-np.max(idx))
+                extenty=np.abs(np.min(idy)-np.max(idy))
+                extent = np.min([extentx, extenty])
+        else:
+            extent = np.min(np.shape(img))
+        # Lags are given as radii so we want the maximum extent possible / 4
+        low=1
+        upp=extent//4
+
+    # set the number of samples
+    if stepsize is None:
+        stepsize = 1
+
+    # Compute spacing between 1 and np.size(x)//2 elements.
+    if spacing=='linear':
+        lags = np.arange(low, upp, stepsize)
+        lags = np.around(lags, decimals=0)
+        lags = np.unique(lags)
+    elif spacing=='log':
+        lags = np.logspace(low, upp, stepsize)
+        lags = np.around(lags, decimals=0)
+        lags = np.unique(lags)
+
+    return lags
 
 def compute_distance(id, ids):
     """
