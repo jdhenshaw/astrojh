@@ -361,6 +361,7 @@ def compute_parameterincrements( img, lagvalue, width=1, njobs=1,
     """
 
     reference = [np.shape(img)[0]//2, np.shape(img)[1]//2]
+
     # create a mask
     mask = annularmask(np.shape(img),centre=reference,radius=lagvalue,width=width)
     maskids = mask_ids(mask, reference=reference, remove_zero=True)
@@ -413,7 +414,7 @@ def compute_parameterincrements( img, lagvalue, width=1, njobs=1,
             # the mean, taking into account independent areas
             std = np.nanstd( np.abs(pivals)**order )
             errsf = std/np.sqrt(n_indep)
-            
+
             pi = [sf,std,errsf]
 
         # Convert to an array

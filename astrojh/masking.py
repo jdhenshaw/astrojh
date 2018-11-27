@@ -284,17 +284,17 @@ def mask_ids(mask, reference=np.array([0,0]), remove_zero=False):
         a reference position from which to return the ids. Given as y, x
 
     """
-    idx, idy = np.where(mask==True)
+    idy, idx = np.where(mask==True)
     idx = idx-reference[1]
     idy = idy-reference[0]
 
     if remove_zero:
-        ids = np.array([idx, idy]).T
+        ids = np.array([idy, idx]).T
         zero = np.where((ids[:,0]==0)&(ids[:,1]==0))[0]
         if np.size(zero!=0):
             ids = [ids[i,:] for i in np.arange(len(ids[:,0])) if i != zero]
             ids = np.asarray(ids)
     else:
-        ids = np.array([idx, idy]).T
+        ids = np.array([idy, idx]).T
 
     return ids
