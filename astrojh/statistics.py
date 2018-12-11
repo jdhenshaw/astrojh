@@ -267,6 +267,119 @@ def sf1d(x, y, order=2, nsamples=None, spacing='linear', irregular=False):
 
     return structx, structy
 
+def sf1d_rot(img, angle_range=None, stepsize=None, order=2, method='linear'):
+    """
+    Rotates an image and computes 1D structure functions along x and y
+    dimensions. The idea is to look for anisotropy in certain quantities, e.g.
+    the velocity field
+
+    Parameters
+    ----------
+    img : ndarray
+        2D array - an image containing the data for which you would like to
+        compute the structure function
+    """
+    from .datatools import create_table
+    headings = ['angle', 'x', 'y']
+    outputdir = './sfangle/x/'
+    outputprefix = 'sf_'
+
+    # Set a value for masked regions
+    dumbvalue=np.NaN
+    # copy the image before rotation
+    imgcopy = np.copy(img)
+    imgcopy[np.isnan(imgcopy)]=dumbvalue
+
+    # import matplotlib.pyplot as plt
+    # fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10.0, 10.0))
+    # plt.subplots_adjust(bottom=0.2,left=0.15,top=0.9,hspace=0.2, wspace=0.2)
+
+    angles=[]
+    angles2=[]
+    sfx = []
+    sfx2 = []
+    sfy = []
+    sfy2 = []
+    # ax.set_xscale('log')
+    # ax.set_yscale('log')
+    for i in np.arange(angle_range[0], angle_range[1], stepsize):
+        outputname = outputprefix+str(i)+'.dat'
+        # rotate the image - do not interpolate otherwise things get funky at
+        # at the edges (order = 0)
+        imgrot = rotate(imgcopy, i, order=0, cval=np.NaN)
+        # start by compressing the information into 1d
+        x, img_x, y, img_y = flattento1d(imgrot)
+        # Now compute the 1d structure function in both dimensions
+        sfx_x, sfx_y = sf1d(x, img_x, order=order)
+        sfy_x, sfy_y = sf1d(y, img_y, order=order)
+
+        avals = np.ones(len(sfx_x))*i
+        avals2 = np.ones(len(sfy_x))*i
+
+        angles.extend(avals)
+        angles2.extend(avals2)
+        sfx.extend(sfx_x)
+        sfx2.extend(sfy_x)
+        sfy.extend(sfx_y)
+        sfy2.extend(sfy_y)
+
+        # ax.plot(sfy_x, sfy_y)
+        # plt.pause(0.01)
+
+    table = create_table(np.array([angles, sfx, sfy]), headings, outputdir=outputdir,
+                        outputfile='testx.dat', overwrite=True)
+    table = create_table(np.array([angles2, sfx2, sfy2]), headings, outputdir=outputdir,
+                        outputfile='testy.dat', overwrite=True)
+    plt.show()
+    return 0,0,0,0
+
+def flattento1d(im):
+    """
+    Average an image along the x and y axis to produce a 1d array. Returns
+    x and y values as well as the averaged image values along both dimensions
+
+    Parameters:
+    -----------
+    img : ndarray
+        2D array - an image containing the data
+    """
+    # import matplotlib.pyplot as plt
+    # If any of the image values are NaNs (they should be) then we need to
+    # establish the min and max extent in each dimension
+    if np.any(np.isnan(im)):
+
+        idy,idx = np.where(~np.isnan(im))
+        if (np.size(idx)==0) or (np.size(idy)==0):
+            raise ValueError("Image is exclusively made up of NaNs")
+        else:
+            # generate the x and y values
+            x = np.arange(np.min(idx), np.max(idx)+1)
+            y = np.arange(np.min(idy), np.max(idy)+1)
+            # create empty arrays to hold the mean values
+            img_x = np.zeros(len(x))
+            img_y = np.zeros(len(y))
+
+            # compute the averages - TODO: careful here? arrays should be
+            # regular but there might be holes in the data - should be ignored
+            # by nanmean but need to test
+            for i in range(len(x)):
+                img_x[i]=np.nanmean(im[:,x[i]])
+            for i in range(len(y)):
+                img_y[i]=np.nanmean(im[y[i],:])
+
+            id = np.where(np.isnan(img_x))
+            img_x[id]=np.nanmean(img_x)
+            id = np.where(np.isnan(img_y))
+            img_y[id]=np.nanmean(img_y)
+    else:
+        x, y = np.arange(np.shape(im)[1]), np.arange(np.shape(im)[0])
+        img_x, img_y= np.nanmean(img, axis=0), np.nanmean(img, axis=1)
+
+    # ax.imshow(im, origin='lower')
+    # plt.pause(0.01)
+
+    return x, img_x, y, img_y
+    
 def PImaps(img, header, scale_range=None, stepsize=None, spacing='linear', width=1,
            njobs=1, outputdir='./', filenameprefix='param_increments',
            return_map=True, write_fits=True, write_stddev=False,
