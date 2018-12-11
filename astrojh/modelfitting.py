@@ -83,6 +83,87 @@ def residual_straightline(pars, x, y, err=None):
 
     return min
 
+def exponentialfit(x,y,err=None,pinit=None,method='leastsq',report_fit=False):
+    """
+    Fits an exponential to 1D data
+
+    Parameters
+    ----------
+    x : ndarray
+        array of x values
+    y : ndarray
+        data to be fit
+    err : ndarray (optional)
+        uncertainties on y data
+    pinit : ndarray (optional)
+        initial guesses for fitting. Format = [mx, c]
+    method : string (optional)
+        method used for the minimisation (default = leastsq)
+
+    """
+    if pinit is None:
+        pars=lmfit.Parameters()
+        pars.add('a', value=1.0)
+        pars.add('b', value=1.0)
+        pars.add('c', value=1.0)
+    else:
+        pars=lmfit.Parameters()
+        pars.add('a', value=pinit[0])
+        pars.add('b', value=pinit[1])
+        pars.add('c', value=pinit[2])
+
+    fitter = lmfit.Minimizer(residual_exponential, pars,
+                             fcn_args=(x,y),
+                             fcn_kws={'err':err},
+                             nan_policy='propagate')
+
+    result = fitter.minimize(method=method)
+
+    if report_fit:
+        lmfit.report_fit(result)
+
+    popt = np.array([result.params['a'].value,
+                     result.params['b'].value,
+                     result.params['c'].value])
+    perr = np.array([result.params['a'].stderr,
+                     result.params['b'].stderr,
+                     result.params['c'].stderr])
+
+    return popt, perr, result
+
+def residual_exponential(pars, x, y, err=None):
+    """
+    Minmizer for lmfit for fitting an exponential
+
+    Parameters
+    ----------
+    pars : lmfit.Parameters()
+
+    x : ndarray
+        array of x positions
+    data : ndarray
+        1-D array containing the data
+    err : ndarray
+        uncertainties on the data
+
+    """
+
+    parvals = pars.valuesdict()
+    a = parvals['a']
+    b = parvals['b']
+    c = parvals['c']
+    model = exponential(x, a, b, c)
+
+    if y is None:
+        min = np.array([model])
+        return min
+    if err is None:
+        min = np.array([model - y])
+        return min
+    min = np.array([(model-y) / err])
+
+    return min
+
 def quadraticfit(x,y,err=None,pinit=None,method='leastsq',report_fit=False):
     """
     Fits a quadratic to data

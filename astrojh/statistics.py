@@ -13,8 +13,10 @@ import itertools
 from astropy.utils.console import ProgressBar
 from .parallel_map import *
 from scipy.ndimage.interpolation import shift
+from scipy.ndimage import rotate
 import os
 from astropy.io import fits
+from scipy.stats.kde import gaussian_kde
 
 def basic_info( arr, sarr=None ):
     """
@@ -114,6 +116,31 @@ def basic_info( arr, sarr=None ):
                                                   normaltest[1],  ')',)
         print("")
         print('===============================================================')
+
+def compute_pdf(arr, nsamples, bw_method=None ):
+    """
+    Gaussian kernel density estimation
+
+    Parameters
+    ----------
+    arr : ndarray
+        array of values
+    nsamples : number
+        number of samples for pdf
+    bw_method : str, scalar or callable, optional
+        The method used to calculate the estimator bandwidth. This can be
+        ‘scott’, ‘silverman’, a scalar constant or a callable. If a scalar,
+        this will be used directly as kde.factor. If a callable, it should
+        take a gaussian_kde instance as only parameter and return a scalar.
+        If None (default), nothing happens; the current kde.covariance_factor
+        method is kept.
+
+    """
+    kde = gaussian_kde(arr)
+    kde.set_bandwidth(bw_method=kde.factor * bw_method)
+    x = np.linspace(np.nanmin(arr),np.nanmax(arr), num=nsamples)
+    pdf = kde(x)
+    return x, pdf
 
 def fft1d( xarr, yarr, nsamples=None, sampling=None, irregular=False,
            method='linear' ):
@@ -238,7 +265,7 @@ def sf1d(x, y, order=2, nsamples=None, spacing='linear', irregular=False):
         # SF is the average measured on a given size scale
         structy.append(np.mean(diff))
 
-    return structx, np.power(structy, (1./order))
+    return structx, structy
 
 def PImaps(img, header, scale_range=None, stepsize=None, spacing='linear', width=1,
            njobs=1, outputdir='./', filenameprefix='param_increments',
@@ -415,10 +442,10 @@ def compute_parameterincrements( img, lagvalue, width=1, njobs=1,
             std = np.nanstd( np.abs(pivals)**order )
             errsf = std/np.sqrt(n_indep)
 
-            pi = [sf,std,errsf]
+            pivals = [sf,std,errsf]
 
         # Convert to an array
-        pi = np.asarray(pi)
+        pi = np.asarray(pivals)
 
     return pi
 
@@ -592,14 +619,11 @@ def compute_lags(img, scale_range=None, stepsize=None, spacing='linear'):
     if stepsize is None:
         stepsize = 1
 
-    # Compute spacing between 1 and np.size(x)//2 elements.
     if spacing=='linear':
         lags = np.arange(low, upp, stepsize)
-        lags = np.around(lags, decimals=0)
         lags = np.unique(lags)
     elif spacing=='log':
         lags = np.logspace(low, upp, stepsize)
-        lags = np.around(lags, decimals=0)
         lags = np.unique(lags)
 
     return lags

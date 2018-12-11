@@ -20,6 +20,18 @@ def polynomial_1D(x, mx, c):
     """
     return mx*x + c
 
+def exponential(x, a, b, c):
+    """
+    Model 1D polynomial
+
+    Parameters
+    ----------
+    x : ndarray
+        array of x values
+
+    """
+    return a*np.exp(-b*x)+c
+
 def polynomial_2D(x, mmx, mx, c):
     """
     Model 2D polynomial
