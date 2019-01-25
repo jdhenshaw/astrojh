@@ -11,6 +11,7 @@ from scipy import optimize
 def straightlinefit(x,y,err=None,pinit=None,method='leastsq',report_fit=False):
     """
     Fits a first-degree bivariate polynomial to 1D data
+
     Parameters
     ----------
     x : ndarray
@@ -82,6 +83,95 @@ def residual_straightline(pars, x, y, err=None):
     min = np.array([(model-y) / err])
 
     return min
+
+def sinewavefit(x,y,err=None,pinit=None,method='leastsq',report_fit=False):
+    """
+    Fits a sine wave to data
+
+    Parameters
+    ----------
+    x : ndarray
+        array of x values
+    y : ndarray
+        data to be fit
+    err : ndarray (optional)
+        uncertainties on y data
+    pinit : ndarray (optional)
+        initial guesses for fitting. Format = [A, B, C, D]; amplitude,
+        frequency, phase, mean
+    method : string (optional)
+        method used for the minimisation (default = leastsq)
+
+    """
+    if pinit is None:
+        pars=lmfit.Parameters()
+        pars.add('A', value=1.0)
+        pars.add('B', value=1.0)
+        pars.add('C', value=1.0)
+        #pars.add('D', value=1.0)
+    else:
+        pars=lmfit.Parameters()
+        pars.add('A', value=pinit[0])
+        pars.add('B', value=pinit[1])
+        pars.add('C', value=pinit[2])
+        #pars.add('D', value=pinit[3])
+
+    fitter = lmfit.Minimizer(residual_sine, pars,
+                             fcn_args=(x,y),
+                             fcn_kws={'err':err},
+                             nan_policy='propagate')
+
+    result = fitter.minimize(method=method)
+
+    if report_fit:
+        lmfit.report_fit(result)
+
+    popt = np.array([result.params['A'].value,
+                     result.params['B'].value,
+                     result.params['C'].value])
+                     #result.params['D'].value])
+    perr = np.array([result.params['A'].stderr,
+                     result.params['B'].stderr,
+                     result.params['C'].stderr])
+                     #result.params['D'].stderr])
+
+    return popt, perr, result
+
+def residual_sine(pars, x, y, err=None):
+    """
+    Minmizer for lmfit for fitting a sine wave
+
+    Parameters
+    ----------
+    pars : lmfit.Parameters()
+
+    x : ndarray
+        array of x positions
+    data : ndarray
+        1-D array containing the data
+    err : ndarray
+        uncertainties on the data
+
+    """
+
+    parvals = pars.valuesdict()
+    A = parvals['A']
+    B = parvals['B']
+    C = parvals['C']
+    #D = parvals['D']
+
+    model = sinusoid(x, A, B, C)
+
+    if y is None:
+        min = np.array([model])
+        return min
+    if err is None:
+        min = np.array([model - y])
+        return min
+    min = np.array([(model-y) / err])
+
+    return min
+
 
 def exponentialfit(x,y,err=None,pinit=None,method='leastsq',report_fit=False):
     """

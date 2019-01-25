@@ -17,6 +17,8 @@ from scipy.ndimage import rotate
 import os
 from astropy.io import fits
 from scipy.stats.kde import gaussian_kde
+from scipy.signal import argrelmin
+from scipy.signal import argrelmax
 
 def basic_info( arr, sarr=None ):
     """
@@ -143,7 +145,7 @@ def compute_pdf(arr, nsamples, bw_method=None ):
     return x, pdf
 
 def fft1d( xarr, yarr, nsamples=None, sampling=None, irregular=False,
-           method='linear' ):
+           method='linear', subtract_mean=False ):
     """
     Accepts two 1D arrays (x, y) a sampling spacing and the number of samples
     and computes one-dimensional discrete Fourier Transform.
@@ -163,18 +165,23 @@ def fft1d( xarr, yarr, nsamples=None, sampling=None, irregular=False,
         place on a regularly spaced grid
     method : string (optional)
         method for scipy.interp1d - NB: keyword 'kind' (default = linear)
+    subtract_mean : bool (optional)
+        Removes 'DC' component of FT
 
     """
     if nsamples is None:
         nsamples = len(xarr)
     if sampling is None:
-        sampling = np.abs(np.min(xarr)-np.max(xarr))/nsamples
+        sampling = np.abs(np.min(xarr)-np.max(xarr))/(nsamples-1)
     if irregular is True:
         xnew = np.linspace(np.min(xarr), np.max(xarr), nsamples)
         yarr = interpolate1D(xnew, yarr, kind=method)
 
     xf = np.fft.fftfreq(nsamples, d=sampling)
-    yf = np.fft.fft(yarr-yarr.mean(), n=nsamples)
+    if subtract_mean:
+        yf = np.fft.fft(yarr-yarr.mean(), n=nsamples)
+    else:
+        yf = np.fft.fft(yarr, n=nsamples)
     xfp = xf[:nsamples//2]
     yfp = np.abs(yf[:nsamples//2])
 
@@ -200,7 +207,8 @@ def peakfinder( xarr, yarr, **kwargs):
         ypospeaks=[]
     return xpospeaks, ypospeaks
 
-def sf1d(x, y, order=2, nsamples=None, spacing='linear', irregular=False):
+def sf1d(x, y, order=2, nsamples=None, spacing='linear', irregular=False,
+         method='linear'):
     """
     Computes 1D structure function
 
@@ -221,8 +229,19 @@ def sf1d(x, y, order=2, nsamples=None, spacing='linear', irregular=False):
         a tolerance into the distance computation. (Default==False)
     """
 
+    nans = np.isnan(y)
+    if np.any(nans):
+        x = [x[i] for i in range(len(x)) if not nans[i]]
+        y = [y[i] for i in range(len(y)) if not nans[i]]
+        x = np.asarray(x)
+        y = np.asarray(y)
+        irregular=True
+
     if nsamples is None:
         nsamples = np.size(x)
+    if irregular is True:
+        xnew = np.linspace(np.min(x), np.max(x), nsamples)
+        y = interpolate1D(xnew, y, kind=method)
 
     # Compute spacing between 1 and np.size(x)//2 elements.
     if spacing=='linear':
@@ -236,6 +255,7 @@ def sf1d(x, y, order=2, nsamples=None, spacing='linear', irregular=False):
 
     structx=structx.astype('int')
     structy=[]
+    errstructy=[]
 
     # if on an irregularly spaced grid then we need to work with
     # absolute distances and incorporate a tolerance level
@@ -247,25 +267,165 @@ def sf1d(x, y, order=2, nsamples=None, spacing='linear', irregular=False):
         diff=[]
         for i in range(len(x)):
             # Find distance between current pixel and all other pixels
-            if not irregular:
-                distances = compute_distance(i,np.arange(len(x)))
-                # select the relevant distance
-                id = np.where(distances==_x)[0]
-            else:
-                distances = compute_distance_irregular(x[i], x)
-                id = np.where((distances>=_x-tolerance)&
-                              (distances<=_x+tolerance))[0]
-
+            distances = compute_distance(i,np.arange(len(x)))
+            # select the relevant distance
+            id = np.where(distances==_x)[0]
             if np.size(id)!=0:
                 originval=y[i]
                 # SF computation
                 diff.extend(np.abs(originval-y[id])**order)
 
+        n_indep = np.size(diff)/_x
         diff=np.asarray(diff)
         # SF is the average measured on a given size scale
         structy.append(np.mean(diff))
+        std = np.nanstd(diff)
+        errstructy.append(std/np.sqrt(n_indep))
 
-    return structx, structy
+    return np.asarray(structx), np.asarray(structy), np.asarray(errstructy)
+
+def get_minima(x, y, axis=0, order=1, mode='clip'):
+    """
+    Returns x and y values of local minima in an array
+
+    Parameters:
+    -----------
+    x : ndarray
+        array of x values
+    y : ndarray
+        array of y values
+    axis : number (optional)
+        Axis over which to select from data. Default is 0.
+    order : number (optional)
+        How many points on each side to use for the comparison to consider
+        comparator(n, n+x) to be True.
+    mode : str (optional)
+        How the edges of the vector are treated. Available options are ‘wrap’
+        (wrap around) or ‘clip’ (treat overflow as the same as the last
+        (or first) element). Default ‘clip’. See numpy.take
+
+    """
+    idminima = argrelmin(y, axis=axis, order=order, mode=mode)
+    xminima = x[idminima]
+    yminima = y[idminima]
+    return xminima, yminima
+
+def get_maxima(x, y, axis=0, order=1, mode='clip'):
+    """
+    Returns x and y values of local minima in an array
+
+    Parameters:
+    -----------
+    x : ndarray
+        array of x values
+    y : ndarray
+        array of y values
+    axis : number (optional)
+        Axis over which to select from data. Default is 0.
+    order : number (optional)
+        How many points on each side to use for the comparison to consider
+        comparator(n, n+x) to be True.
+    mode : str (optional)
+        How the edges of the vector are treated. Available options are ‘wrap’
+        (wrap around) or ‘clip’ (treat overflow as the same as the last
+        (or first) element). Default ‘clip’. See numpy.take
+
+    """
+    idmaxima = argrelmax(y, axis=axis, order=order, mode=mode)
+    xmaxima = x[idmaxima]
+    ymaxima = y[idmaxima]
+    return xmaxima, ymaxima
+
+def remove_resonances(x, y, atol=0.1, max_sep=None, **kwargs):
+    """
+    First attempt at coding something up to remove resonances which appear in
+    structure functions. Returns an array of minima cleaned of resonances.
+
+    Further notes
+    -------------
+    It is possible to set a maximum separation length. Any spacings below this
+    length scale will not be evaluated as resonances. Only those above the
+    length scale. For a chain of cores in a filament this could be set to the
+    maximum observed spacing between adjacent cores. Anything below that
+    separation may be a genuine feature in the structure function and everything
+    above that separation should be included in the resonance evaluation.
+
+    Parameters
+    ----------
+    x : ndarray
+        array of x values
+    y : ndarray
+        array of y values
+    atol : number (optional)
+        tolerance value for acceptance as a resonance
+    max_sep : number (optional)
+        estimate of the maximum separation between features
+    """
+
+    # firstly find the minima and maxima
+    xmin, ymin = get_minima(x, y, **kwargs)
+
+    # set up the remove array - this will be gradually populated telling us
+    # which minima should be removed
+    remove_res = np.zeros(len(xmin), dtype='bool')
+    nmeas = len(xmin)
+
+    # We are going to divide each quantity in the xmin array by all quantities
+    # in that array to establish if there are resonances within some tolerance
+    # value. So set up arrays of size nmeas x nmeas to hold this information
+    res_matrix = np.zeros([nmeas, nmeas], dtype='float')
+    rem_matrix = np.zeros([nmeas, nmeas], dtype='bool')
+
+    # These are the resonant factors (skip 1 since we want to keep those). The
+    # upper value is largely arbitrary, but you want to make sure enough values
+    # are selected
+    factor_array = np.arange(2, nmeas+1)
+
+    # cycle through the values
+    for i in range(nmeas):
+        # divide all values by all values
+        for j in range(nmeas):
+            factor = xmin[j]/xmin[i]
+            res_matrix[i,j] = factor
+
+        # create an array for each value of xmin which we will populate
+        rem_matrix_indiv = np.zeros([len(factor_array), nmeas], dtype='bool')
+        # cycle through the possible factors and test to see if any resonances
+        # exist
+        for j in range(len(factor_array)):
+            # the value we are going to compare
+            comparison_value = factor_array[j]
+            # the array of values divided by the position of the current minimum
+            value_array = res_matrix[i,:]
+            # fill this boolean array to say if any resonances exist
+            rem_matrix_indiv[j,:] = np.isclose(value_array, comparison_value,
+                                               atol=atol)
+
+        # Now update the rem matrix to establish if any of the values should be
+        # removed
+        for j in range(nmeas):
+            if np.any(rem_matrix_indiv[:,j]):
+                rem_matrix[i,j]=True
+
+    # Now update the remove_res array
+    for i in range(len(xmin)):
+        if np.any(rem_matrix[:,i]):
+            remove_res[i]=True
+
+
+    if max_sep is not None:
+        # if there are features below this length scale we want to start our
+        # evaluation with the largest separation that sits below this limit.
+        # Anything smaller than this will be automatically assumed to not be
+        # a resonant feature.
+        # identify all minima below this length scale
+        idlim = np.where(xmin < max_sep)[0]
+        remove_res[idlim]=False
+
+    xmin = xmin[~remove_res]
+    ymin = ymin[~remove_res]
+
+    return xmin, ymin
 
 def sf1d_rot(img, angle_range=None, stepsize=None, order=2, method='linear'):
     """
@@ -379,7 +539,7 @@ def flattento1d(im):
     # plt.pause(0.01)
 
     return x, img_x, y, img_y
-    
+
 def PImaps(img, header, scale_range=None, stepsize=None, spacing='linear', width=1,
            njobs=1, outputdir='./', filenameprefix='param_increments',
            return_map=True, write_fits=True, write_stddev=False,

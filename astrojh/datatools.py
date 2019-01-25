@@ -133,7 +133,7 @@ def distance_along_curve(model, origin=0):
 def average_along_curve(distances, data, weights=None):
     """
     Computes the average data quantity for each distance along a model. Returns
-    unique distance and mean data
+    unique distance, mean data, and standard deviation at each location
 
     Parameters
     ----------
@@ -147,13 +147,18 @@ def average_along_curve(distances, data, weights=None):
     """
     uniquedistances = np.unique(distances)
     meandata = []
+    stddev = []
     for _d in uniquedistances:
         ids = np.where(distances==_d)[0]
         if np.size(ids) != 0.0:
             datasubsample = data[ids]
             if weights is not None:
                 weightssubsample = weights[ids]
-                meandata.append(np.average(datasubsample, weights=weightssubsample))
+                mean = np.average(datasubsample, weights=weightssubsample)
+                variance = np.average((datasubsample-mean)**2, weights=weightssubsample)
+                meandata.append(mean)
+                stddev.append(np.sqrt(variance))
             else:
                 meandata.append(np.average(datasubsample))
-    return uniquedistances,np.asarray(meandata)
+                stddev.append(np.std(datasubsample))
+    return uniquedistances,np.asarray(meandata),np.asarray(stddev)

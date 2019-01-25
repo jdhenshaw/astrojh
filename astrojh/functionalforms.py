@@ -88,7 +88,7 @@ def polynomial_plane2D(x, y, mmx, mx, mmy, my, c):
     """
     return mmx*x**2 + mx*x + mmy*y**2 + my*y + c
 
-def sinusoid(x, A, T, p):
+def sinusoid(x, A, B, C, D):
     """
     A sinusoidal function
 
@@ -98,14 +98,17 @@ def sinusoid(x, A, T, p):
         array of x values
     A : float
         Amplitude of the sine wave
-    T : float
-        1/T = frequency of the wave
-    p : float
+    B : float
+        wavelength
+    C : float
         phase correction
+    D: float
+        mean
     """
-    return A*np.sin(2.*np.pi*(x-p)/T)
+    #return A*np.sin(2.*np.pi*(x-p)/T)
+    return A*np.sin((2.*np.pi*x / B) + C) + D
 
-def sinusoid_varyfreq(x, A, T, p):
+def sinusoid_varyfreq(x, A, B, C, D):
     """
     A sinusoidal function
 
@@ -120,9 +123,10 @@ def sinusoid_varyfreq(x, A, T, p):
     p : float
         phase correction
     """
-    return A*np.sin(2.*np.pi*(x-p)/T)
+    return A*np.sin((2.*np.pi*x / B) + C) + D
+    #return A*np.sin(2.*np.pi*(x-p)/T)
 
-def gaussian(x, mu, std):
+def gaussian(x, mu, std, amp=None):
     """
     Model Gaussian profile - will accept multiple centroid values
 
@@ -134,12 +138,20 @@ def gaussian(x, mu, std):
         array of centroids (make sure this is an array otherwise it will fail)
     std : float
         array of standard devations
+    amp : float (optional)
+        array of amplitudes, otherwise set to 1.0
+
 
     """
+    if amp is None:
+        amp = np.ones(len(mu))
+
     gauss=np.zeros_like(x, dtype=float)
     for i in range(len(mu)):
         normdist = norm(loc=mu[i], scale=std[i])
-        gauss+=normdist.pdf(x)
+        gaussfunc = (normdist.pdf(x)/np.max(normdist.pdf(x))) * amp[i]
+        if ~np.all(np.isnan(gaussfunc)):        
+            gauss+=gaussfunc
 
     return gauss
 
