@@ -39,12 +39,12 @@ def create_table(columns, headings, table_name='mytable',
 
     return mytable
 
-def interpolate1D(x, y, kind='linear'):
+def interpolate1D(x, y, newx, kind='linear', **kwargs):
     """
     Perform a simple 1D linear interpolation
     """
-    interp = interp1d(x, y, kind=kind)
-    interpy = interp(x)
+    interp = interp1d(x, y, kind=kind, **kwargs)
+    interpy = interp(newx)
 
     return interpy
 
@@ -94,7 +94,6 @@ def map_to_model(data, model):
         datapoint = np.array([data[:,i]],dtype=float)
         distance_to_curve = distance.cdist(datapoint, model.T)[0]
         distancetocurve[i]=np.min(distance_to_curve)
-
         idcurve = np.where(distance_to_curve==np.min(distance_to_curve))[0]
         maptomodel[i]=int(idcurve)
     return maptomodel, distancetocurve
@@ -133,7 +132,7 @@ def distance_along_curve(model, origin=0):
 def average_along_curve(distances, data, weights=None):
     """
     Computes the average data quantity for each distance along a model. Returns
-    unique distance and mean data
+    unique distance, mean data, and standard deviation at each location
 
     Parameters
     ----------
@@ -147,13 +146,18 @@ def average_along_curve(distances, data, weights=None):
     """
     uniquedistances = np.unique(distances)
     meandata = []
+    stddev = []
     for _d in uniquedistances:
         ids = np.where(distances==_d)[0]
         if np.size(ids) != 0.0:
             datasubsample = data[ids]
             if weights is not None:
                 weightssubsample = weights[ids]
-                meandata.append(np.average(datasubsample, weights=weightssubsample))
+                mean = np.average(datasubsample, weights=weightssubsample)
+                variance = np.average((datasubsample-mean)**2, weights=weightssubsample)
+                meandata.append(mean)
+                stddev.append(np.sqrt(variance))
             else:
                 meandata.append(np.average(datasubsample))
-    return uniquedistances,np.asarray(meandata)
+                stddev.append(np.std(datasubsample))
+    return uniquedistances,np.asarray(meandata),np.asarray(stddev)

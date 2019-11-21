@@ -150,7 +150,7 @@ def cart2polar(x, y):
 
     """
     r = np.sqrt(x**2 + y**2)
-    theta = np.arctan2(x, y)
+    theta = np.arctan2(x,y)
     return r, theta
 
 

@@ -28,6 +28,25 @@ def sexstrgal(ra, dec, frame='fk5'):
     lat = coords.b.deg
     return lon, lat
 
+def galsexstr(glon, glat, frame='fk5'):
+    """
+    Galactic coordinates to Sexagesimal Ra/dec string
+
+    Parameters
+    ----------
+    glon : number
+        galactic longitude
+    glat : string
+        galactic latitude
+    frame : string
+        coordinate frame
+    """
+    coords = SkyCoord(glon, glat, frame='galactic', unit=(u.deg, u.deg))
+    coords = coords.transform_to(frame)
+    rastr = coords.ra.to_string(unit='hour',sep=':', alwayssign=True)
+    decstr = coords.dec.to_string(unit='deg',sep=':', alwayssign=True)
+    return rastr, decstr
+
 def Ntomsd(column_density, mu_p=2.8):
     """
     Accepts a column density in units of particles per square centimetre and the
@@ -41,7 +60,7 @@ def Ntomsd(column_density, mu_p=2.8):
         mean molecular weight (default=2.8)
     """
     column_density = column_density*u.cm**-2
-    msd = mu_p * ap.M_p * n
+    msd = mu_p * ap.M_p * column_density
     msd = msd.to(ap.solMass / u.pc**2)
     return msd
 
@@ -92,7 +111,7 @@ def rhoton(mass_density, mu_p=2.8):
         mean molecular weight (default=2.8)
     """
     mass_density = mass_density * (u.kg / u.m**3)
-    number_density = mass_density / mu_p * ap.M_p
+    number_density = mass_density / (mu_p * ap.M_p)
     number_density = number_density.to(u.cm**-3)
     return number_density
 

@@ -253,8 +253,8 @@ def rectmask_img(img, centre=None, width=None, wcs=None):
         xp=int(centre[1]+width[1]//2); xn=int(centre[1]-width[1]//2)
         yp=int(centre[0]+width[0]//2); yn=int(centre[0]-width[0]//2)
     else:
-        xp=int(centre[1]+width/2); xn=int(centre[1]-width/2)
-        yp=int(centre[0]+width/2); yn=int(centre[0]-width/2)
+        xp=int(centre[1]+width//2); xn=int(centre[1]-width//2)
+        yp=int(centre[0]+width//2); yn=int(centre[0]-width//2)
 
     if xn < 0:
         xn = 0
@@ -265,7 +265,7 @@ def rectmask_img(img, centre=None, width=None, wcs=None):
     if yp > y:
         yp = y
 
-    dist_from_centre[yn:yp,xn:xp]=1.0
+    dist_from_centre[yn:yp+1,xn:xp+1]=1.0
     mask = (dist_from_centre == 1.0)
     newimg = np.where(mask==1, img, np.NaN)
 

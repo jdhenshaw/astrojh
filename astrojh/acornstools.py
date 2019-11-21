@@ -176,21 +176,25 @@ def get_leaf_positions(acorn, outputdir='./', outputfile='leafpositions.dat',
     A = Acorns.load_from(acorn)
     xpeaks=[]
     ypeaks=[]
+    leafids=[]
     for tree in A.forest:
         for leaf in A.forest[tree].leaves:
             peakvalue = leaf.statistics[0][1]
             if clipbelow is not None:
                 if peakvalue > clipbelow:
                     peakloc = leaf.peak_location
+                    leafids.append(leaf.cluster_idx)
                     xpeaks.append(peakloc[0])
                     ypeaks.append(peakloc[1])
             else:
                 peakloc = leaf.peak_location
+                leafids.append(leaf.idx)
                 xpeaks.append(peakloc[0])
                 ypeaks.append(peakloc[1])
 
-    headings=['x position', 'y position']
+    headings=['leafid', 'x position', 'y position']
     table = Table(meta={'name':'leaf peak positions'})
+    table['leafid'] = Column(leafids)
     table['x position'] = Column(xpeaks)
     table['y position'] = Column(ypeaks)
     table.write(outputfile, format='ascii', overwrite=True)

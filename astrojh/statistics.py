@@ -17,6 +17,9 @@ from scipy.ndimage import rotate
 import os
 from astropy.io import fits
 from scipy.stats.kde import gaussian_kde
+from scipy.signal import argrelmin
+from scipy.signal import argrelmax
+from scipy.spatial import cKDTree
 
 def basic_info( arr, sarr=None ):
     """
@@ -143,7 +146,7 @@ def compute_pdf(arr, nsamples, bw_method=None ):
     return x, pdf
 
 def fft1d( xarr, yarr, nsamples=None, sampling=None, irregular=False,
-           method='linear' ):
+           method='linear', subtract_mean=False ):
     """
     Accepts two 1D arrays (x, y) a sampling spacing and the number of samples
     and computes one-dimensional discrete Fourier Transform.
@@ -163,18 +166,23 @@ def fft1d( xarr, yarr, nsamples=None, sampling=None, irregular=False,
         place on a regularly spaced grid
     method : string (optional)
         method for scipy.interp1d - NB: keyword 'kind' (default = linear)
+    subtract_mean : bool (optional)
+        Removes 'DC' component of FT
 
     """
     if nsamples is None:
         nsamples = len(xarr)
     if sampling is None:
-        sampling = np.abs(np.min(xarr)-np.max(xarr))/nsamples
+        sampling = np.abs(np.min(xarr)-np.max(xarr))/(nsamples-1)
     if irregular is True:
         xnew = np.linspace(np.min(xarr), np.max(xarr), nsamples)
         yarr = interpolate1D(xnew, yarr, kind=method)
 
     xf = np.fft.fftfreq(nsamples, d=sampling)
-    yf = np.fft.fft(yarr-yarr.mean(), n=nsamples)
+    if subtract_mean:
+        yf = np.fft.fft(yarr-yarr.mean(), n=nsamples)
+    else:
+        yf = np.fft.fft(yarr, n=nsamples)
     xfp = xf[:nsamples//2]
     yfp = np.abs(yf[:nsamples//2])
 
@@ -200,7 +208,8 @@ def peakfinder( xarr, yarr, **kwargs):
         ypospeaks=[]
     return xpospeaks, ypospeaks
 
-def sf1d(x, y, order=2, nsamples=None, spacing='linear', irregular=False):
+def sf1d(x, y, order=2, nsamples=None, spacing='linear', irregular=False,
+         method='linear'):
     """
     Computes 1D structure function
 
@@ -221,8 +230,19 @@ def sf1d(x, y, order=2, nsamples=None, spacing='linear', irregular=False):
         a tolerance into the distance computation. (Default==False)
     """
 
+    nans = np.isnan(y)
+    if np.any(nans):
+        x = [x[i] for i in range(len(x)) if not nans[i]]
+        y = [y[i] for i in range(len(y)) if not nans[i]]
+        x = np.asarray(x)
+        y = np.asarray(y)
+        irregular=True
+
     if nsamples is None:
         nsamples = np.size(x)
+    if irregular is True:
+        xnew = np.linspace(np.min(x), np.max(x), nsamples)
+        y = interpolate1D(x,y,xnew, kind=method)
 
     # Compute spacing between 1 and np.size(x)//2 elements.
     if spacing=='linear':
@@ -236,6 +256,7 @@ def sf1d(x, y, order=2, nsamples=None, spacing='linear', irregular=False):
 
     structx=structx.astype('int')
     structy=[]
+    errstructy=[]
 
     # if on an irregularly spaced grid then we need to work with
     # absolute distances and incorporate a tolerance level
@@ -247,30 +268,284 @@ def sf1d(x, y, order=2, nsamples=None, spacing='linear', irregular=False):
         diff=[]
         for i in range(len(x)):
             # Find distance between current pixel and all other pixels
-            if not irregular:
-                distances = compute_distance(i,np.arange(len(x)))
-                # select the relevant distance
-                id = np.where(distances==_x)[0]
-            else:
-                distances = compute_distance_irregular(x[i], x)
-                id = np.where((distances>=_x-tolerance)&
-                              (distances<=_x+tolerance))[0]
-
+            distances = compute_distance(i,np.arange(len(x)))
+            # select the relevant distance
+            id = np.where(distances==_x)[0]
             if np.size(id)!=0:
                 originval=y[i]
                 # SF computation
                 diff.extend(np.abs(originval-y[id])**order)
 
+        n_indep = np.size(diff)/_x
+        #n_indep = np.size(x)-_x
         diff=np.asarray(diff)
         # SF is the average measured on a given size scale
         structy.append(np.mean(diff))
+        std = np.nanstd(diff)
+        errstructy.append(std/np.sqrt(n_indep))
 
-    return structx, structy
+    return np.asarray(structx), np.asarray(structy), np.asarray(errstructy)
+
+def get_minima(x, y, axis=0, order=1, mode='clip'):
+    """
+    Returns x and y values of local minima in an array
+
+    Parameters:
+    -----------
+    x : ndarray
+        array of x values
+    y : ndarray
+        array of y values
+    axis : number (optional)
+        Axis over which to select from data. Default is 0.
+    order : number (optional)
+        How many points on each side to use for the comparison to consider
+        comparator(n, n+x) to be True.
+    mode : str (optional)
+        How the edges of the vector are treated. Available options are ‘wrap’
+        (wrap around) or ‘clip’ (treat overflow as the same as the last
+        (or first) element). Default ‘clip’. See numpy.take
+
+    """
+    idminima = argrelmin(y, axis=axis, order=order, mode=mode)
+    xminima = x[idminima]
+    yminima = y[idminima]
+    return xminima, yminima
+
+def get_maxima(x, y, axis=0, order=1, mode='clip'):
+    """
+    Returns x and y values of local minima in an array
+
+    Parameters:
+    -----------
+    x : ndarray
+        array of x values
+    y : ndarray
+        array of y values
+    axis : number (optional)
+        Axis over which to select from data. Default is 0.
+    order : number (optional)
+        How many points on each side to use for the comparison to consider
+        comparator(n, n+x) to be True.
+    mode : str (optional)
+        How the edges of the vector are treated. Available options are ‘wrap’
+        (wrap around) or ‘clip’ (treat overflow as the same as the last
+        (or first) element). Default ‘clip’. See numpy.take
+
+    """
+    idmaxima = argrelmax(y, axis=axis, order=order, mode=mode)
+    xmaxima = x[idmaxima]
+    ymaxima = y[idmaxima]
+    return xmaxima, ymaxima
+
+def remove_resonances(x, y, atol=0.1, max_sep=None, **kwargs):
+    """
+    First attempt at coding something up to remove resonances which appear in
+    structure functions. Returns an array of minima cleaned of resonances.
+
+    Further notes
+    -------------
+    It is possible to set a maximum separation length. Any spacings below this
+    length scale will not be evaluated as resonances. Only those above the
+    length scale. For a chain of cores in a filament this could be set to the
+    maximum observed spacing between adjacent cores. Anything below that
+    separation may be a genuine feature in the structure function and everything
+    above that separation should be included in the resonance evaluation.
+
+    Parameters
+    ----------
+    x : ndarray
+        array of x values
+    y : ndarray
+        array of y values
+    atol : number (optional)
+        tolerance value for acceptance as a resonance
+    max_sep : number (optional)
+        estimate of the maximum separation between features
+    """
+
+    # firstly find the minima and maxima
+    xmin, ymin = get_minima(x, y, **kwargs)
+
+    # set up the remove array - this will be gradually populated telling us
+    # which minima should be removed
+    remove_res = np.zeros(len(xmin), dtype='bool')
+    nmeas = len(xmin)
+
+    # We are going to divide each quantity in the xmin array by all quantities
+    # in that array to establish if there are resonances within some tolerance
+    # value. So set up arrays of size nmeas x nmeas to hold this information
+    res_matrix = np.zeros([nmeas, nmeas], dtype='float')
+    rem_matrix = np.zeros([nmeas, nmeas], dtype='bool')
+
+    # These are the resonant factors (skip 1 since we want to keep those). The
+    # upper value is largely arbitrary, but you want to make sure enough values
+    # are selected
+    factor_array = np.arange(2, nmeas+1)
+
+    # cycle through the values
+    for i in range(nmeas):
+        # divide all values by all values
+        for j in range(nmeas):
+            factor = xmin[j]/xmin[i]
+            res_matrix[i,j] = factor
+
+        # create an array for each value of xmin which we will populate
+        rem_matrix_indiv = np.zeros([len(factor_array), nmeas], dtype='bool')
+        # cycle through the possible factors and test to see if any resonances
+        # exist
+        for j in range(len(factor_array)):
+            # the value we are going to compare
+            comparison_value = factor_array[j]
+            # the array of values divided by the position of the current minimum
+            value_array = res_matrix[i,:]
+            # fill this boolean array to say if any resonances exist
+            rem_matrix_indiv[j,:] = np.isclose(value_array, comparison_value,
+                                               atol=atol)
+
+        # Now update the rem matrix to establish if any of the values should be
+        # removed
+        for j in range(nmeas):
+            if np.any(rem_matrix_indiv[:,j]):
+                rem_matrix[i,j]=True
+
+    # Now update the remove_res array
+    for i in range(len(xmin)):
+        if np.any(rem_matrix[:,i]):
+            remove_res[i]=True
+
+
+    if max_sep is not None:
+        # if there are features below this length scale we want to start our
+        # evaluation with the largest separation that sits below this limit.
+        # Anything smaller than this will be automatically assumed to not be
+        # a resonant feature.
+        # identify all minima below this length scale
+        idlim = np.where(xmin < max_sep)[0]
+        remove_res[idlim]=False
+
+    xmin = xmin[~remove_res]
+    ymin = ymin[~remove_res]
+
+    return xmin, ymin
+
+def sf1d_rot(img, angle_range=None, stepsize=None, order=2, method='linear'):
+    """
+    Rotates an image and computes 1D structure functions along x and y
+    dimensions. The idea is to look for anisotropy in certain quantities, e.g.
+    the velocity field
+
+    Parameters
+    ----------
+    img : ndarray
+        2D array - an image containing the data for which you would like to
+        compute the structure function
+    """
+    from .datatools import create_table
+    headings = ['angle', 'x', 'y']
+    outputdir = './sfangle/x/'
+    outputprefix = 'sf_'
+
+    # Set a value for masked regions
+    dumbvalue=np.NaN
+    # copy the image before rotation
+    imgcopy = np.copy(img)
+    imgcopy[np.isnan(imgcopy)]=dumbvalue
+
+    # import matplotlib.pyplot as plt
+    # fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10.0, 10.0))
+    # plt.subplots_adjust(bottom=0.2,left=0.15,top=0.9,hspace=0.2, wspace=0.2)
+
+    angles=[]
+    angles2=[]
+    sfx = []
+    sfx2 = []
+    sfy = []
+    sfy2 = []
+    # ax.set_xscale('log')
+    # ax.set_yscale('log')
+    for i in np.arange(angle_range[0], angle_range[1], stepsize):
+        outputname = outputprefix+str(i)+'.dat'
+        # rotate the image - do not interpolate otherwise things get funky at
+        # at the edges (order = 0)
+        imgrot = rotate(imgcopy, i, order=0, cval=np.NaN)
+        # start by compressing the information into 1d
+        x, img_x, y, img_y = flattento1d(imgrot)
+        # Now compute the 1d structure function in both dimensions
+        sfx_x, sfx_y = sf1d(x, img_x, order=order)
+        sfy_x, sfy_y = sf1d(y, img_y, order=order)
+
+        avals = np.ones(len(sfx_x))*i
+        avals2 = np.ones(len(sfy_x))*i
+
+        angles.extend(avals)
+        angles2.extend(avals2)
+        sfx.extend(sfx_x)
+        sfx2.extend(sfy_x)
+        sfy.extend(sfx_y)
+        sfy2.extend(sfy_y)
+
+        # ax.plot(sfy_x, sfy_y)
+        # plt.pause(0.01)
+
+    table = create_table(np.array([angles, sfx, sfy]), headings, outputdir=outputdir,
+                        outputfile='testx.dat', overwrite=True)
+    table = create_table(np.array([angles2, sfx2, sfy2]), headings, outputdir=outputdir,
+                        outputfile='testy.dat', overwrite=True)
+    plt.show()
+    return 0,0,0,0
+
+def flattento1d(im):
+    """
+    Average an image along the x and y axis to produce a 1d array. Returns
+    x and y values as well as the averaged image values along both dimensions
+
+    Parameters:
+    -----------
+    img : ndarray
+        2D array - an image containing the data
+    """
+    # import matplotlib.pyplot as plt
+    # If any of the image values are NaNs (they should be) then we need to
+    # establish the min and max extent in each dimension
+    if np.any(np.isnan(im)):
+
+        idy,idx = np.where(~np.isnan(im))
+        if (np.size(idx)==0) or (np.size(idy)==0):
+            raise ValueError("Image is exclusively made up of NaNs")
+        else:
+            # generate the x and y values
+            x = np.arange(np.min(idx), np.max(idx)+1)
+            y = np.arange(np.min(idy), np.max(idy)+1)
+            # create empty arrays to hold the mean values
+            img_x = np.zeros(len(x))
+            img_y = np.zeros(len(y))
+
+            # compute the averages - TODO: careful here? arrays should be
+            # regular but there might be holes in the data - should be ignored
+            # by nanmean but need to test
+            for i in range(len(x)):
+                img_x[i]=np.nanmean(im[:,x[i]])
+            for i in range(len(y)):
+                img_y[i]=np.nanmean(im[y[i],:])
+
+            id = np.where(np.isnan(img_x))
+            img_x[id]=np.nanmean(img_x)
+            id = np.where(np.isnan(img_y))
+            img_y[id]=np.nanmean(img_y)
+    else:
+        x, y = np.arange(np.shape(im)[1]), np.arange(np.shape(im)[0])
+        img_x, img_y= np.nanmean(img, axis=0), np.nanmean(img, axis=1)
+
+    # ax.imshow(im, origin='lower')
+    # plt.pause(0.01)
+
+    return x, img_x, y, img_y
 
 def PImaps(img, header, scale_range=None, stepsize=None, spacing='linear', width=1,
            njobs=1, outputdir='./', filenameprefix='param_increments',
            return_map=True, write_fits=True, write_stddev=False,
-           write_nmeas=False, sf=False, order=2):
+           write_nmeas=False, sf=False, order=2, angle=None):
     """
     Computes map of parameter increments
 
@@ -329,7 +604,7 @@ def PImaps(img, header, scale_range=None, stepsize=None, spacing='linear', width
     for lagvalue in ProgressBar(lags):
         pi = compute_parameterincrements(img,lagvalue,width=width,njobs=njobs,
                                          return_map=return_map,
-                                         sf=sf, order=order)
+                                         sf=sf, order=order, angle=angle)
         # add it to the list
         pilist.append(pi)
 
@@ -357,7 +632,8 @@ def PImaps(img, header, scale_range=None, stepsize=None, spacing='linear', width
     return lags, piarr
 
 def compute_parameterincrements( img, lagvalue, width=1, njobs=1,
-                                 return_map=False, sf=False, order=2 ):
+                                 return_map=False, sf=False, order=2,
+                                 angle=None ):
     """
     Parallelised computation of parameter increments. Returns an array of values
     corresponding to the parameter increment given as
@@ -393,10 +669,21 @@ def compute_parameterincrements( img, lagvalue, width=1, njobs=1,
     mask = annularmask(np.shape(img),centre=reference,radius=lagvalue,width=width)
     maskids = mask_ids(mask, reference=reference, remove_zero=True)
 
+    if angle is not None:
+        tree = cKDTree(maskids)
+        angles = [angle, angle+180]
+        circloc = np.asarray([point_on_circle(lagvalue, theta) for theta in angles])
+        maskids = np.asarray([maskids[tree.query(_circloc)[1]] for _circloc in circloc])
+
     # Parallel processing of parameter increments
     args = [img,lagvalue,return_map]
     inputvalues = [[maskid]+args for maskid in maskids ]
     pimaps = parallel_map(parallelpi, inputvalues, numcores=njobs)
+    pimaps = [value for value in pimaps if np.size(value)!=0.0]
+
+    if angle is not None:
+        if (np.shape(pimaps)[1]==1):
+            pimaps=pimaps[0]
 
     if return_map:
         maps = np.asarray(pimaps)
@@ -472,15 +759,15 @@ def parallelpi(inputvalues):
     dumbvalue = -1e10
     # unpack inputs
     maskid, img, radius, return_map = inputvalues
-    maskidx = maskid[1]
-    maskidy = maskid[0]
+    maskidx = maskid[0]
+    maskidy = maskid[1]
 
     # create a copy of the image and fill it with stupid values instead of NaN
     imgcopy = np.copy(img)
     imgcopy[np.isnan(imgcopy)]=dumbvalue
 
     # begin by shifting the image
-    imgshift = shift(imgcopy, [maskidy,maskidx], cval=dumbvalue)
+    imgshift = shift(imgcopy, [maskidx,maskidy], cval=dumbvalue)
     # Get rid of the dumb values
     iddumb = np.where((imgshift>=(dumbvalue-200.))&
                       (imgshift<=(dumbvalue+200.)))
@@ -495,7 +782,7 @@ def parallelpi(inputvalues):
     return imgdiff
 
 def sf2d(img, order=2, scale_range=None, stepsize=None, spacing='linear', width=1,
-         njobs=1):
+         njobs=1, angle=None):
     """
     Computes 2D structure function
 
@@ -520,7 +807,8 @@ def sf2d(img, order=2, scale_range=None, stepsize=None, spacing='linear', width=
     """
     lags, sf = PImaps(img, None, scale_range=scale_range, stepsize=stepsize,
                       spacing=spacing, width=width, njobs=njobs,
-                      return_map=False, write_fits=False, sf=True, order=order)
+                      return_map=False, write_fits=False, sf=True, order=order,
+                      angle=angle)
 
     return lags, sf[:,0], sf[:,2]
 
@@ -528,7 +816,7 @@ def sf2d_maps(img, header, order=2, scale_range=None, stepsize=None,
               spacing='linear', width=1, njobs=1,
               outputdir='./', filenameprefix='sf',
               return_map=True, write_fits=True, write_stddev=False,
-              write_nmeas=False):
+              write_nmeas=False, angle=None):
     """
     Computes 2D structure function
 
@@ -569,7 +857,8 @@ def sf2d_maps(img, header, order=2, scale_range=None, stepsize=None,
                       spacing=spacing, width=width, njobs=njobs,
                       return_map=True,write_fits=write_fits,outputdir=outputdir,
                       filenameprefix=filenameprefix, write_stddev=write_stddev,
-                      write_nmeas=write_nmeas, sf=True, order=order)
+                      write_nmeas=write_nmeas, sf=True, order=order,
+                      angle=angle)
 
     return lags, sf
 
@@ -670,3 +959,28 @@ def compute_tolerance(x):
     meandiff = np.mean(diffarr)
     tol = np.abs(meandiff/2.)
     return tol
+
+def point_on_circle(radius, angle):
+    """
+    Computes the x,y location of a position on a circle given a certain angle
+    """
+    from math import cos, sin, radians
+    #center of circle, angle in degree and radius of circle
+    center = [0,0]
+    angle = np.radians(angle)
+    #x = offsetX + radius * Cosine(radians)
+    x = center[0] + (radius * np.cos(angle))
+    #y = offsetY + radius * Sine(radians)
+    y = center[1] + (radius * np.sin(angle))
+    x = np.around(x, decimals=2)
+    y = np.around(y, decimals=2)
+
+    return np.array([y,x])
+
+def generate_kdtree(maskids):
+    """
+    Generates a KDTree to be queried for nearest neighbour searches
+    """
+    tree = cKDTree(maskids.T)
+
+    return tree
