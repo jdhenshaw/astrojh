@@ -39,12 +39,12 @@ def create_table(columns, headings, table_name='mytable',
 
     return mytable
 
-def interpolate1D(x, y, kind='linear'):
+def interpolate1D(x, y, newx, kind='linear', **kwargs):
     """
     Perform a simple 1D linear interpolation
     """
-    interp = interp1d(x, y, kind=kind)
-    interpy = interp(x)
+    interp = interp1d(x, y, kind=kind, **kwargs)
+    interpy = interp(newx)
 
     return interpy
 
@@ -94,7 +94,6 @@ def map_to_model(data, model):
         datapoint = np.array([data[:,i]],dtype=float)
         distance_to_curve = distance.cdist(datapoint, model.T)[0]
         distancetocurve[i]=np.min(distance_to_curve)
-
         idcurve = np.where(distance_to_curve==np.min(distance_to_curve))[0]
         maptomodel[i]=int(idcurve)
     return maptomodel, distancetocurve

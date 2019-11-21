@@ -90,5 +90,22 @@ def tdep( mass, SFR ):
     mass = mass * ap.solMass
     SFR = SFR * (ap.solMass/u.yr)
     tdep = mass/SFR
-    tdep.to(u.yr)
+    tdep = tdep.to(u.yr)
     return tdep
+
+def tcoll_cylinder( number_density, mu_p=2.8 ):
+    """
+    Computes the collapse timescale for gravitational instability in a cylinder
+    assuming a growth rate of w = 0.339(4* pi * G * rho)^0.5 (Nagasawa 1987)
+
+    Parameters
+    ----------
+    number_density : float
+        number density in particles per cubic centimetre
+    mu_p : float (optional)
+        Molecular mass (default = 2.8)
+    """
+    mass_density = ntorho(number_density, mu_p)
+    tcol = 1./(0.34*( 4. * np.pi * const.G * mass_density )**0.5)
+    tcol = tcol.to(u.yr)
+    return tcol

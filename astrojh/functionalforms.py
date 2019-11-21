@@ -3,6 +3,7 @@
 #==============================================================================#
 import numpy as np
 from scipy.stats import norm
+from .datatools import interpolate1D
 
 def polynomial_1D(x, mx, c):
     """
@@ -88,7 +89,26 @@ def polynomial_plane2D(x, y, mmx, mx, mmy, my, c):
     """
     return mmx*x**2 + mx*x + mmy*y**2 + my*y + c
 
-def sinusoid(x, A, B, C, D):
+def polynomial_plane2Dy(x, y, mx, mmy, my, c):
+    """
+    Quadratic function in y linear in x
+
+    Parameters
+    ----------
+    x : ndarray
+        array of x values
+    y : ndarray
+        array of y values
+    mx : float
+    mmy : float
+    my : float
+    c : float
+        offset
+
+    """
+    return mx*x + mmy*y**2 + my*y + c
+
+def sinusoid(x, amp, wavelength, phase, offset):
     """
     A sinusoidal function
 
@@ -96,17 +116,93 @@ def sinusoid(x, A, B, C, D):
     ----------
     x : ndarray
         array of x values
-    A : float
+    amp : float
         Amplitude of the sine wave
-    B : float
+    wavelength : float
         wavelength
-    C : float
+    phase : float
         phase correction
-    D: float
+    offset: float
         mean
     """
     #return A*np.sin(2.*np.pi*(x-p)/T)
-    return A*np.sin((2.*np.pi*x / B) + C) + D
+    return amp*np.sin((2.*np.pi*x / wavelength) + phase) + offset
+
+def sinusoid_rand(x0, amp, wavelength, method='linear', npoints=100, alt=False):
+    """
+    A sinusoidal function
+
+    Parameters
+    ----------
+    x : ndarray
+        array of x values
+    amp : float
+        Array of amplitude values
+    wavelength : float
+        Array of wavelength values
+    phase : float
+        Array of phase values
+    offset: float
+        array of offset values
+    """
+
+    _x = []
+    _y = []
+
+    r = range(len(amp))
+    r = list(r)
+    for j in range(len(amp)):
+        if (j % 2 != 0):
+            r[j]=r[j]-1
+    _r = np.copy(r)
+    del r[0::2]
+    rshort = list(range(len(r)))
+    ids = []
+    for j in rshort:
+        if (j % 2 != 0):
+            id = list(np.where(_r == r[j])[0])
+
+            ids.append(id)
+    ids = [val for sublist in ids for val in sublist]
+
+    for i in range(len(amp)):
+
+        if i == 0:
+            x0 = x0
+        else:
+            x0 = x0+wavelength[i-1]/2.
+
+        x = np.linspace(0.0, wavelength[i]*10, num=1000)
+        y = sinusoid(x, amp[i], wavelength[i], 0.0, 0.0)
+        id = np.where(x<((wavelength[i]/2)))
+        id = id[0]
+        x=x[id]
+        y=y[id]
+        x = x+x0
+
+
+        if alt:
+            if i in ids:
+                y=y*-1
+        else:
+            if (i % 2 != 0):
+                y=y*-1
+
+        _x.append([val for val in x])
+        _y.append([val for val in y])
+
+    _x = [_val for _list in _x for _val in _list]
+    _y = [_val for _list in _y for _val in _list]
+
+    xarr = np.asarray(_x)
+    yarr = np.asarray(_y)
+
+    _xarr = np.linspace(np.min(xarr), np.max(xarr), npoints)
+    _yarr = interpolate1D(xarr, yarr, _xarr, kind=method)
+
+    return _xarr, _yarr
+
+
 
 def sinusoid_varyfreq(x, A, B, C, D):
     """
@@ -150,7 +246,7 @@ def gaussian(x, mu, std, amp=None):
     for i in range(len(mu)):
         normdist = norm(loc=mu[i], scale=std[i])
         gaussfunc = (normdist.pdf(x)/np.max(normdist.pdf(x))) * amp[i]
-        if ~np.all(np.isnan(gaussfunc)):        
+        if ~np.all(np.isnan(gaussfunc)):
             gauss+=gaussfunc
 
     return gauss

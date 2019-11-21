@@ -84,6 +84,90 @@ def residual_straightline(pars, x, y, err=None):
 
     return min
 
+def gaussianfit(x, y, err = None, pinit=None,method='leastsq',report_fit=False):
+    """
+    Fits a gaussian profile to data
+
+    Parameters
+    ----------
+    x : ndarray
+        array of x values
+    y : ndarray
+        data to be fit
+    err : ndarray (optional)
+        uncertainties on y data
+    pinit : ndarray (optional)
+        initial guesses for fitting. Format = [A, B, C, D]; amplitude,
+        frequency, phase, mean
+    method : string (optional)
+        method used for the minimisation (default = leastsq)
+
+    """
+    if pinit is None:
+        pars=lmfit.Parameters()
+        pars.add('mu', value=0.0)
+        pars.add('std', value=1.0)
+        pars.add('amp', value=1.0)
+    else:
+        pars=lmfit.Parameters()
+        pars.add('mu', value=pinit[0])
+        pars.add('std', value=pinit[1])
+        pars.add('amp', value=pinit[2])
+        #pars.add('D', value=pinit[3])
+
+    fitter = lmfit.Minimizer(residual_gauss, pars,
+                             fcn_args=(x,y),
+                             fcn_kws={'err':err},
+                             nan_policy='propagate')
+
+    result = fitter.minimize(method=method)
+
+    if report_fit:
+        lmfit.report_fit(result)
+
+    popt = np.array([result.params['mu'].value,
+                     result.params['std'].value,
+                     result.params['amp'].value])
+    perr = np.array([result.params['mu'].stderr,
+                     result.params['std'].stderr,
+                     result.params['amp'].stderr])
+
+    return popt, perr, result
+
+def residual_gauss(pars, x, y, err=None):
+    """
+    Minmizer for lmfit for fitting a gaussian
+
+    Parameters
+    ----------
+    pars : lmfit.Parameters()
+
+    x : ndarray
+        array of x positions
+    data : ndarray
+        1-D array containing the data
+    err : ndarray
+        uncertainties on the data
+
+    """
+
+    parvals = pars.valuesdict()
+    mu = parvals['mu']
+    std = parvals['std']
+    amp = parvals['amp']
+
+    model = gaussian(x, np.array([mu]), np.array([std]), np.array([amp]))
+
+    if y is None:
+        min = np.array([model])
+        return min
+    if err is None:
+        min = np.array([model - y])
+        return min
+    min = np.array([(model-y) / err])
+
+    return min
+
 def sinewavefit(x,y,err=None,pinit=None,method='leastsq',report_fit=False):
     """
     Fits a sine wave to data
@@ -502,6 +586,96 @@ def residual_quadratic_planefit(pars, x, y, data=None, err=None):
     my = parvals['my']
     c = parvals['c']
     model = polynomial_plane2D(x, y, mmx, mx, mmy, my, c)
+
+    if data is None:
+        min = np.array([model])
+        return min
+    if err is None:
+        min = np.array([model - data])
+        return min
+    min = np.array([(model-data) / err])
+
+    return min
+
+def quadratic_planefity(x, y, z, err=None, pinit=None, method='leastsq',
+                      report_fit=False):
+    """
+    Fits a bivariate polynomial to 2D data - quadratic in y linear in x
+
+    Parameters
+    ----------
+    x : ndarray
+        array of x values
+    y : ndarray
+        array of y values
+    z : ndarray
+        data to be fit
+    err : ndarray (optional)
+        uncertainties on z data
+    pinit : ndarray (optional)
+        initial guesses for fitting. Format = [mmx, mx, mmy, my, c]
+    method : string (optional)
+        method used for the minimisation (default = leastsq)
+
+    """
+    if pinit is None:
+        pars=lmfit.Parameters()
+        pars.add('mx', value=1.0)
+        pars.add('mmy', value=1.0)
+        pars.add('my', value=1.0)
+        pars.add('c', value=1.0)
+    else:
+        pars=lmfit.Parameters()
+        pars.add('mx', value=pinit[1])
+        pars.add('mmy', value=pinit[2])
+        pars.add('my', value=pinit[3])
+        pars.add('c', value=pinit[4])
+
+    fitter = lmfit.Minimizer(residual_quadratic_planefity, pars,
+                             fcn_args=(x,y),
+                             fcn_kws={'data':z, 'err':err},
+                             nan_policy='propagate')
+
+    result = fitter.minimize(method=method)
+
+    if report_fit:
+        lmfit.report_fit(result)
+
+    popt = np.array([result.params['mx'].value,
+                     result.params['mmy'].value,
+                     result.params['my'].value,
+                     result.params['c'].value])
+    perr = np.array([result.params['mx'].stderr,
+                     result.params['mmy'].stderr,
+                     result.params['my'].stderr,
+                     result.params['c'].stderr])
+
+    return popt, perr, result
+
+def residual_quadratic_planefity(pars, x, y, data=None, err=None):
+    """
+    Minmizer for lmfit for fitting a quadratic 2-D plane to data
+
+    Parameters
+    ----------
+    pars : lmfit.Parameters()
+
+    x : ndarray
+        array of x positions
+    y : ndarray
+        array of y positions
+    data : ndarray
+        2-D image containing the data
+    err : ndarray
+        uncertainties on the data
+
+    """
+    parvals = pars.valuesdict()
+    mx = parvals['mx']
+    mmy = parvals['mmy']
+    my = parvals['my']
+    c = parvals['c']
+    model = polynomial_plane2Dy(x, y, mx, mmy, my, c)
 
     if data is None:
         min = np.array([model])

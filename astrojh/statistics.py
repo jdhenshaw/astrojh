@@ -19,6 +19,7 @@ from astropy.io import fits
 from scipy.stats.kde import gaussian_kde
 from scipy.signal import argrelmin
 from scipy.signal import argrelmax
+from scipy.spatial import cKDTree
 
 def basic_info( arr, sarr=None ):
     """
@@ -241,7 +242,7 @@ def sf1d(x, y, order=2, nsamples=None, spacing='linear', irregular=False,
         nsamples = np.size(x)
     if irregular is True:
         xnew = np.linspace(np.min(x), np.max(x), nsamples)
-        y = interpolate1D(xnew, y, kind=method)
+        y = interpolate1D(x,y,xnew, kind=method)
 
     # Compute spacing between 1 and np.size(x)//2 elements.
     if spacing=='linear':
@@ -276,6 +277,7 @@ def sf1d(x, y, order=2, nsamples=None, spacing='linear', irregular=False,
                 diff.extend(np.abs(originval-y[id])**order)
 
         n_indep = np.size(diff)/_x
+        #n_indep = np.size(x)-_x
         diff=np.asarray(diff)
         # SF is the average measured on a given size scale
         structy.append(np.mean(diff))
@@ -543,7 +545,7 @@ def flattento1d(im):
 def PImaps(img, header, scale_range=None, stepsize=None, spacing='linear', width=1,
            njobs=1, outputdir='./', filenameprefix='param_increments',
            return_map=True, write_fits=True, write_stddev=False,
-           write_nmeas=False, sf=False, order=2):
+           write_nmeas=False, sf=False, order=2, angle=None):
     """
     Computes map of parameter increments
 
@@ -602,7 +604,7 @@ def PImaps(img, header, scale_range=None, stepsize=None, spacing='linear', width
     for lagvalue in ProgressBar(lags):
         pi = compute_parameterincrements(img,lagvalue,width=width,njobs=njobs,
                                          return_map=return_map,
-                                         sf=sf, order=order)
+                                         sf=sf, order=order, angle=angle)
         # add it to the list
         pilist.append(pi)
 
@@ -630,7 +632,8 @@ def PImaps(img, header, scale_range=None, stepsize=None, spacing='linear', width
     return lags, piarr
 
 def compute_parameterincrements( img, lagvalue, width=1, njobs=1,
-                                 return_map=False, sf=False, order=2 ):
+                                 return_map=False, sf=False, order=2,
+                                 angle=None ):
     """
     Parallelised computation of parameter increments. Returns an array of values
     corresponding to the parameter increment given as
@@ -666,10 +669,21 @@ def compute_parameterincrements( img, lagvalue, width=1, njobs=1,
     mask = annularmask(np.shape(img),centre=reference,radius=lagvalue,width=width)
     maskids = mask_ids(mask, reference=reference, remove_zero=True)
 
+    if angle is not None:
+        tree = cKDTree(maskids)
+        angles = [angle, angle+180]
+        circloc = np.asarray([point_on_circle(lagvalue, theta) for theta in angles])
+        maskids = np.asarray([maskids[tree.query(_circloc)[1]] for _circloc in circloc])
+
     # Parallel processing of parameter increments
     args = [img,lagvalue,return_map]
     inputvalues = [[maskid]+args for maskid in maskids ]
     pimaps = parallel_map(parallelpi, inputvalues, numcores=njobs)
+    pimaps = [value for value in pimaps if np.size(value)!=0.0]
+
+    if angle is not None:
+        if (np.shape(pimaps)[1]==1):
+            pimaps=pimaps[0]
 
     if return_map:
         maps = np.asarray(pimaps)
@@ -745,15 +759,15 @@ def parallelpi(inputvalues):
     dumbvalue = -1e10
     # unpack inputs
     maskid, img, radius, return_map = inputvalues
-    maskidx = maskid[1]
-    maskidy = maskid[0]
+    maskidx = maskid[0]
+    maskidy = maskid[1]
 
     # create a copy of the image and fill it with stupid values instead of NaN
     imgcopy = np.copy(img)
     imgcopy[np.isnan(imgcopy)]=dumbvalue
 
     # begin by shifting the image
-    imgshift = shift(imgcopy, [maskidy,maskidx], cval=dumbvalue)
+    imgshift = shift(imgcopy, [maskidx,maskidy], cval=dumbvalue)
     # Get rid of the dumb values
     iddumb = np.where((imgshift>=(dumbvalue-200.))&
                       (imgshift<=(dumbvalue+200.)))
@@ -768,7 +782,7 @@ def parallelpi(inputvalues):
     return imgdiff
 
 def sf2d(img, order=2, scale_range=None, stepsize=None, spacing='linear', width=1,
-         njobs=1):
+         njobs=1, angle=None):
     """
     Computes 2D structure function
 
@@ -793,7 +807,8 @@ def sf2d(img, order=2, scale_range=None, stepsize=None, spacing='linear', width=
     """
     lags, sf = PImaps(img, None, scale_range=scale_range, stepsize=stepsize,
                       spacing=spacing, width=width, njobs=njobs,
-                      return_map=False, write_fits=False, sf=True, order=order)
+                      return_map=False, write_fits=False, sf=True, order=order,
+                      angle=angle)
 
     return lags, sf[:,0], sf[:,2]
 
@@ -801,7 +816,7 @@ def sf2d_maps(img, header, order=2, scale_range=None, stepsize=None,
               spacing='linear', width=1, njobs=1,
               outputdir='./', filenameprefix='sf',
               return_map=True, write_fits=True, write_stddev=False,
-              write_nmeas=False):
+              write_nmeas=False, angle=None):
     """
     Computes 2D structure function
 
@@ -842,7 +857,8 @@ def sf2d_maps(img, header, order=2, scale_range=None, stepsize=None,
                       spacing=spacing, width=width, njobs=njobs,
                       return_map=True,write_fits=write_fits,outputdir=outputdir,
                       filenameprefix=filenameprefix, write_stddev=write_stddev,
-                      write_nmeas=write_nmeas, sf=True, order=order)
+                      write_nmeas=write_nmeas, sf=True, order=order,
+                      angle=angle)
 
     return lags, sf
 
@@ -943,3 +959,28 @@ def compute_tolerance(x):
     meandiff = np.mean(diffarr)
     tol = np.abs(meandiff/2.)
     return tol
+
+def point_on_circle(radius, angle):
+    """
+    Computes the x,y location of a position on a circle given a certain angle
+    """
+    from math import cos, sin, radians
+    #center of circle, angle in degree and radius of circle
+    center = [0,0]
+    angle = np.radians(angle)
+    #x = offsetX + radius * Cosine(radians)
+    x = center[0] + (radius * np.cos(angle))
+    #y = offsetY + radius * Sine(radians)
+    y = center[1] + (radius * np.sin(angle))
+    x = np.around(x, decimals=2)
+    y = np.around(y, decimals=2)
+
+    return np.array([y,x])
+
+def generate_kdtree(maskids):
+    """
+    Generates a KDTree to be queried for nearest neighbour searches
+    """
+    tree = cKDTree(maskids.T)
+
+    return tree
