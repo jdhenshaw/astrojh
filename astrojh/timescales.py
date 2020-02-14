@@ -71,7 +71,7 @@ def tdyn( size, vel ):
     vel=vel*(u.km/u.s)
 
     tdyn=size/vel
-    tdyn=tcross.to(u.yr)
+    tdyn=tdyn.to(u.yr)
     return tdyn
 
 def tdep( mass, SFR ):
