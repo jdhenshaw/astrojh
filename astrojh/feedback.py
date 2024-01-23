@@ -161,13 +161,13 @@ def momentum(density, Nly, time, temperature):
     """
     density = density * u.cm**-3
     Nly = Nly * u.s**-1
-    time = time * u.yr / 1.e6
-    temperature = temperature * u.K / 1.e4
+    time = time * u.yr
+    temperature = temperature * u.K
 
     P = 1.5e5 * (density/(100.* u.cm**-3))**(-1./7.) * \
                 (Nly/(1e49 * u.s**-1))**(4./7.) * \
-                (time/( 1.* u.yr))**(9./7.) * \
-                (temperature /(1. * u.K))**(-8./7.)
+                (time/( 1.e6* u.yr))**(9./7.) * \
+                (temperature /(1.e4 * u.K))**(-8./7.)
 
     P = P * ap.solMass * u.km * u.s**-1
 
@@ -193,14 +193,233 @@ def energy(density, Nly, time, temperature):
     """
     density = density * u.cm**-3
     Nly = Nly * u.s**-1
-    time = time * u.yr / 1.e6
-    temperature = temperature * u.K / 1.e4
+    time = time * u.yr
+    temperature = temperature * u.K
 
     energy = 8.1e47 * (density/(100.* u.cm**-3))**(-10./7.) * \
                 (Nly/(1e49 * u.s**-1))**(5./7.) * \
-                (time/(1. * u.yr))**(6./7.) * \
-                (temperature /(1. * u.K))**(10./7.)
+                (time/(1.e6 * u.yr))**(6./7.) * \
+                (temperature /(1.e4 * u.K))**(10./7.)
 
     energy = energy * u.erg
 
     return energy
+
+def r_spitz(Nly, n_e, temperature, t, mu_p=0.64, alpha=2.6e-13):
+    from .kinematics import cs
+    temperature = temperature * u.K
+    t = t * u.yr
+    cs_ion = cs(temperature.value,mu_p=mu_p)
+    r_st = r_strom(Nly, n_e, alpha=alpha)
+
+    r_s = r_st * (1.+((7.*cs_ion*t)/(4.*r_st)))**(4./7.)
+
+    r_s = r_s.to(u.pc)
+    return r_s
+
+def v_spitz(Nly, n_e, temperature, t, mu_p=0.64, alpha=2.6e-13):
+    from .kinematics import cs
+    temperature = temperature * u.K
+    t = t * u.yr
+    cs_ion = cs(temperature.value,mu_p=mu_p)
+    r_st = r_strom(Nly, n_e, alpha=alpha)
+
+    v_s = cs_ion * (1.+((7.*cs_ion*t)/(4.*r_st)))**(-3./7.)
+    v_s = v_s.to(u.km/u.s)
+    return v_s
+
+def t_spitz(Nly, n_e, temperature, r, mu_p=0.64, alpha=2.6e-13):
+    from .kinematics import cs
+    temperature = temperature * u.K
+    r = r*u.pc
+    cs_ion = cs(temperature.value,mu_p=mu_p)
+    r_st = r_strom(Nly, n_e, alpha=alpha)
+    t_s=(4./7.)*(r_st/cs_ion)*((r/r_st)**(7.0/4.0)-1.0)
+    t_s=t_s.to(u.yr)
+    return t_s
+
+def r_hosokawa(Nly, n_e, temperature, t, mu_p=0.64, alpha=2.6e-13):
+    from .kinematics import cs
+    temperature = temperature * u.K
+    t = t * u.yr
+    cs_ion = cs(temperature.value,mu_p=mu_p)
+    r_st = r_strom(Nly, n_e, alpha=alpha)
+
+    r_h = r_st * (1.+((7.*np.sqrt(4)*cs_ion*t)/(4.*np.sqrt(3)*r_st)))**(4./7.)
+    return r_h
+
+def v_hosokawa(Nly, n_e, temperature, t, mu_p=0.64, alpha=2.6e-13):
+    from .kinematics import cs
+    temperature = temperature * u.K
+    t = t * u.yr
+    cs_ion = cs(temperature.value,mu_p=mu_p)
+    r_st = r_strom(Nly, n_e, alpha=alpha)
+
+    v_h = cs_ion * (4./3.)**(0.5)*(1.+((7.*np.sqrt(4)*cs_ion*t)/(4.*np.sqrt(3)*r_st)))**(-3./7.)
+    v_h = v_h.to(u.km/u.s)
+    return v_h
+
+def t_hosokawa(Nly, n_e, temperature, r, mu_p=0.64, alpha=2.6e-13):
+    from .kinematics import cs
+    temperature = temperature * u.K
+    r = r*u.pc
+    cs_ion = cs(temperature.value,mu_p=mu_p)
+    r_st = r_strom(Nly, n_e, alpha=alpha)
+    t_h=(4./7.)*(3./4.)**(0.5)*(r_st/cs_ion)*((r/r_st)**(7.0/4.0)-1.0)
+    t_h=t_h.to(u.yr)
+    return t_h
+
+def Lwind(mass_loss, vinf):
+    mass_loss = mass_loss * ap.solMass * u.yr**-1
+    vinf = vinf * u.km * u.s**-1
+
+    Lwind = 0.5 * mass_loss * vinf**2
+    Lwind = Lwind.to(u.erg * u.s**-1)
+
+    return Lwind
+
+def r_weaver(mass_loss, vinf, rho0, tdyn):
+    Lw=Lwind(mass_loss, vinf)
+    rho0 = rho0 * u.g* u.cm**-3
+    tdyn = tdyn * u.yr
+    cons=(125./(154.*np.pi))**(1./5.)
+    rw = cons * (Lw/rho0)**(1./5.) * tdyn**(3./5.)
+
+    rw = rw.to(u.pc)
+    return rw
+
+def r_weaver_tcool(mass_loss, vinf, rho0, tdyn, tcool):
+    Lw=Lwind(mass_loss, vinf)
+    rho0 = rho0 * u.g* u.cm**-3
+    tdyn = tdyn * u.yr
+    tcool=tcool*u.yr
+    cons=(125./(154.*np.pi))**(1./5.)
+    rw = cons * (Lw/rho0)**(1./5.) * tdyn**(1./4.) * tcool **(7./20.)
+
+    rw = rw.to(u.pc)
+    return rw
+
+def r_weaver_Lwind(Lw, rho0, t):
+    Lw=Lw*(u.erg*u.s**-1)
+    rho0 = rho0 * u.g* u.cm**-3
+    t= t * u.yr
+    cons=(125./(154.*np.pi))**(1./5.)
+    rw = cons * (Lw/rho0)**(1./5.) * t**(3./5.)
+
+    rw = rw.to(u.pc)
+    return rw
+
+def t_weaver(r,Lw,rho0):
+    Lw=Lw*(u.erg*u.s**-1)
+    rho0 = rho0 * u.g* u.cm**-3
+    rw=r*u.pc
+    cons=(125./(154.*np.pi))**(1./5.)
+
+    tw = (rw/cons)**(5./3.)*(Lw/rho0)**(-1./3.)
+    tw=tw.to(u.yr)
+    return tw
+
+def t_weaver_tcool(r,Lw,rho0, tcool):
+    Lw=Lw*(u.erg*u.s**-1)
+    rho0 = rho0 * u.g* u.cm**-3
+    rw=r*u.pc
+    tcool=tcool*u.yr
+    cons=(125./(154.*np.pi))**(1./5.)
+
+    tw = (rw/cons)**(4.)*(Lw/rho0)**(-4./5.)*tcool**(-7./5.)
+    tw=tw.to(u.yr)
+    return tw
+
+def t_weaver_constv(r, v):
+    r=r*u.pc
+    v=v*u.km/u.s
+
+    tw = (3./5.)*r/v
+    tw=tw.to(u.yr)
+    return tw
+
+
+def l_weaver(mass, r, v):
+    mass = mass * ap.solMass
+    r = r *u.pc
+    v=v*u.km/u.s
+
+    lw=(77./18.)*mass*v**3 / r
+    lw=lw.to(u.erg/u.s)
+    return lw
+
+def v_weaver(mass_loss, vinf, rho0, t):
+    Lw=Lwind(mass_loss, vinf)
+    rho0 = rho0 * u.g* u.cm**-3
+    t = t * u.yr
+    cons=(125./(154.*np.pi))**(1./5.)
+    vw = (3./5.) * cons * (Lw/rho0)**(1./5.) * t**(-2./5.)
+
+    vw = vw.to(u.km*u.s**-1)
+    return vw
+
+def v_weaver_Lwind(lw, rho0, t):
+    Lw=lw*u.erg/u.s
+    rho0 = rho0 * u.g* u.cm**-3
+    t = t * u.yr
+    cons=(125./(154.*np.pi))**(1./5.)
+    vw = (3./5.) * cons * (Lw/rho0)**(1./5.) * t**(-2./5.)
+
+    vw = vw.to(u.km*u.s**-1)
+    return vw
+
+def v_weaver_Lwind_tcool(lw, rho0, t, tcool):
+    Lw=lw*u.erg/u.s
+    rho0 = rho0 * u.g* u.cm**-3
+    t = t * u.yr
+    tcool=tcool*u.yr
+    cons=(125./(154.*np.pi))**(1./5.)
+    vw = (1./4.) * cons * (Lw/rho0)**(1./5.) * t**(-3./4.) * tcool**(7./20.)
+
+    vw = vw.to(u.km*u.s**-1)
+    return vw
+# def energy_weaver(lw, t):
+#     lw=lw*u.erg/u.s
+#     t=t*u.yr
+#     ew = 1.4e49*u.erg*(lw/(1e36*u.erg/u.s))*(t/(1e6*u.yr))
+#     return ew
+
+def energy_weaver(Lw, t):
+    Lw=Lw*u.erg/u.s
+    t=t*u.yr
+    ew = (15./77.)*Lw*t
+    ew=ew.to(u.erg)
+    return ew
+
+def tcool(z, lw, n0):
+    Lw=lw*u.erg/u.s
+    n0 = n0 * u.cm**-3
+    tcool=0.96*(z)**(-35./22.) * (Lw/(1e37*u.erg/u.s))**(3./11.) * (n0/(20.* u.cm**-3))**(-8./11.)
+    tcool=tcool*u.Myr
+    tcool=tcool.to(u.yr)
+    return tcool
+
+def rcool(mass_loss, vinf, rho0, z):
+    Lw=Lwind(mass_loss, vinf)
+    from .conversions import rhoton
+    rho0 = rho0 * u.g* u.cm**-3
+    rho0 = rho0.to(u.kg * u.m**-3)
+    n0 = rhoton(rho0.value, mu_p=1.4)
+    tc = tcool(z, Lw.value, n0.value)
+
+    rc = r_weaver_Lwind(Lw.value,rho0.to(u.g * u.cm**-3).value, tc.value)
+
+    return rc
+
+
+
+def r_weaver_Lwind_tcool(Lw, rho0, t, tcool):
+    Lw=Lw*(u.erg*u.s**-1)
+    rho0 = rho0 * u.g* u.cm**-3
+    t= t * u.yr
+    tcool=tcool * u.yr
+    cons=(125./(154.*np.pi))**(1./5.)
+    rw = cons * (Lw/rho0)**(1./5.) * t**(1./4.)*tcool**(7./20.)
+
+    rw = rw.to(u.pc)
+    return rw
