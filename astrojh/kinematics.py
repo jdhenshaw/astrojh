@@ -23,7 +23,7 @@ def cs( t, mu_p=2.33 ):
 
     """
     t = t*u.K
-    cs = np.sqrt(( const.k_B * t ) / ( mu_p * ap.M_p ))
+    cs = np.sqrt(( const.k_B * t ) / ( mu_p * const.m_p ))
     cs = cs.to(u.km/u.s)
     return cs
 
